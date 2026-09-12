@@ -18,7 +18,6 @@
     "email": "shubhamagr281999@gmail.com",
     "linkedin": "https://www.linkedin.com/in/1-shubham-agrawal/",
     "github": "https://github.com/shubhamagr281999",
-    "huggingface": "https://huggingface.co/AgrShubham",
     "resume": "/resume.pdf",
     "site_url": "https://shubhamagr281999.github.io/",
     "favicon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23FBFAF8'/%3E%3Cpath d='M4 24h24M8 24V14M16 24V8M24 24v-6' stroke='%239A4415' stroke-width='3' fill='none' stroke-linecap='square'/%3E%3C/svg%3E"
@@ -26,6 +25,24 @@
   "intro": [
     "I build the infrastructure that makes robot learning work: simulation, dataset curation, and the evaluation harness that tells you whether a policy actually got better. Before that I spent three years on a production autonomy stack for an indoor mobile robot, across every layer of it, from the GPIO driver that moves the wheels to the TSDF mapper that decides where they go.",
     "I am looking for robot learning and embodied-AI roles where the model and the robot are the same problem."
+  ],
+  "hero_stats": [
+    {
+      "value": "3+ yrs",
+      "label": "production robotics"
+    },
+    {
+      "value": "7",
+      "label": "projects here"
+    },
+    {
+      "value": "2",
+      "label": "VLA architectures traced to operation level"
+    },
+    {
+      "value": "IIT-B",
+      "label": "B.Tech + M.Tech, Mechanical"
+    }
   ],
   "projects": [
     {

@@ -58,6 +58,49 @@ def chips(items, cls="chip") -> str:
     return "".join(f'<li class="{cls}">{E(i)}</li>' for i in items)
 
 
+# ------------------------------------------------- linking projects to skills
+#
+# The skills panel highlights the entries a project actually uses as you scroll
+# past it. The matching is done HERE, at build time, so the browser only has to
+# toggle a class — no fuzzy string matching at runtime, and the result is
+# inspectable in the generated HTML.
+
+def skill_keys(label: str) -> set:
+    """Normalise a stack or skill label into comparable tokens.
+
+    'C++17 / Eigen' -> {'c17', 'eigen'};  'MuJoCo' -> {'mujoco'}
+    Parenthesised asides count too, so 'VLA models (Pi-0.5, OpenVLA-OFT)'
+    matches a project listing 'OpenVLA-OFT'.
+    """
+    parts = re.split(r"[/,()]| and ", label.lower())
+    out = set()
+    for p in parts:
+        k = re.sub(r"[^a-z0-9]", "", p)
+        if len(k) > 2:
+            out.add(k)
+    return out
+
+
+def skill_index(groups: list) -> list:
+    """[(key, label)] for every skill item, key being its first token."""
+    out = []
+    for g in groups or []:
+        for item in g.get("items", []):
+            ks = skill_keys(item)
+            if ks:
+                out.append((sorted(ks)[0], item, ks))
+    return out
+
+
+def project_skill_ids(pr: dict, index: list) -> str:
+    """Space-separated skill keys this project's stack touches."""
+    stack_tokens = set()
+    for s in pr.get("stack", []):
+        stack_tokens |= skill_keys(s)
+    hit = [key for key, _label, ks in index if ks & stack_tokens]
+    return " ".join(sorted(set(hit)))
+
+
 def links_list(items, cls="link-list") -> str:
     if not items:
         return ""
@@ -101,10 +144,13 @@ def media_block(m: dict, lazy: bool = True) -> str:
 # ---------------------------------------------------------------- page scaffold
 
 def head(title: str, description: str, person: dict, page_url: str, og_image: str | None,
-         css_href: str, jsonld: str | None = None) -> str:
+         css_href: str, jsonld: str | None = None, js_href: str | None = None) -> str:
     parts = [
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        # Flag JS before first paint so reveal animations never leave content
+        # hidden for a reader without JavaScript.
+        '<script>document.documentElement.classList.add("js")</script>',
         f"<title>{E(title)}</title>",
         f'<meta name="description" content="{E(description)}">',
         f'<meta property="og:title" content="{E(title)}">',
@@ -120,6 +166,8 @@ def head(title: str, description: str, person: dict, page_url: str, og_image: st
     if person.get("favicon"):
         parts.append(f'<link rel="icon" href="{E(person["favicon"])}">')
     parts.append(f'<link rel="stylesheet" href="{E(css_href)}">')
+    if js_href:
+        parts.append(f'<script src="{E(js_href)}" defer></script>')
     if jsonld:
         parts.append(f'<script type="application/ld+json">{jsonld}</script>')
     return "\n  ".join(parts)
@@ -155,6 +203,19 @@ def contact_links(person: dict, primary_first: bool = True) -> list:
 
 # ---------------------------------------------------------------- sections
 
+def render_stats(stats: list) -> str:
+    if not stats:
+        return ""
+    items = "".join(
+        '<div class="stat">'
+        f'<span class="stat__value">{E(str(s.get("value", "")))}</span>'
+        f'<span class="stat__label">{E(s.get("label", ""))}</span>'
+        "</div>"
+        for s in stats
+    )
+    return f'<div class="hero__stats">{items}</div>'
+
+
 def render_hero(site: dict) -> str:
     p = site["person"]
     bits = [f'<h1 class="hero__name">{E(p.get("name", ""))}</h1>']
@@ -165,13 +226,23 @@ def render_hero(site: dict) -> str:
         text = "\n\n".join(intro) if isinstance(intro, list) else intro
         bits.append(f'<div class="hero__intro">{paras(text)}</div>')
     bits.append(f'<nav class="hero__links" aria-label="Contact">{links_list(contact_links(p))}</nav>')
-    hero_media = ""
-    if site.get("hero_media"):
-        hero_media = f'<div class="hero__media">{media_block(site["hero_media"], lazy=False)}</div>'
-    return f'<header class="hero">{"".join(bits)}{hero_media}</header>'
+
+    viz = ""
+    if site.get("_hero_svg"):
+        viz = f'<div class="hero__viz">{site["_hero_svg"]}</div>'
+    elif site.get("hero_media"):
+        viz = f'<div class="hero__media">{media_block(site["hero_media"], lazy=False)}</div>'
+
+    cue = ('<a class="hero__cue" href="#work">'
+           '<span class="hero__cue-text">See the work</span>'
+           '<span class="hero__cue-arrow" aria-hidden="true"></span></a>')
+
+    return (f'<header class="hero">'
+            f'<div class="hero__grid"><div class="hero__text">{"".join(bits)}</div>{viz}</div>'
+            f'{render_stats(site.get("hero_stats"))}{cue}</header>')
 
 
-def render_project_card(pr: dict) -> str:
+def render_project_card(pr: dict, index: list | None = None) -> str:
     head_bits = [f'<h3 class="project__title">{E(pr.get("title", ""))}</h3>']
     if pr.get("period"):
         head_bits.append(f'<p class="project__period">{E(pr["period"])}</p>')
@@ -183,6 +254,12 @@ def render_project_card(pr: dict) -> str:
     if pr.get("lead_media"):
         out.append(f'<div class="project__media">{media_block(pr["lead_media"])}</div>')
 
+    if pr.get("stack"):
+        out.append(f'<ul class="project__stack">{chips(pr["stack"])}</ul>')
+
+    # Problem / Approach / Outcome live inside <details>: present in the HTML for
+    # search engines and link previews, collapsed for the scanner, and keyboard
+    # operable with no JavaScript at all.
     blocks = []
     for label, key in (("Problem", "problem"), ("Approach", "approach"), ("Outcome", "outcome")):
         if pr.get(key):
@@ -193,10 +270,16 @@ def render_project_card(pr: dict) -> str:
                 "</div>"
             )
     if blocks:
-        out.append(f'<div class="project__blocks">{"".join(blocks)}</div>')
-
-    if pr.get("stack"):
-        out.append(f'<ul class="project__stack">{chips(pr["stack"])}</ul>')
+        out.append(
+            '<details class="project__detail">'
+            '<summary class="project__toggle">'
+            '<span class="project__toggle-label" data-open="Hide the detail"'
+            ' data-closed="Problem, approach, outcome">Problem, approach, outcome</span>'
+            '<span class="project__toggle-icon" aria-hidden="true"></span>'
+            "</summary>"
+            f'<div class="project__blocks">{"".join(blocks)}</div>'
+            "</details>"
+        )
 
     link_items = list(pr.get("links", []))
     if pr.get("deep_dive"):
@@ -205,7 +288,10 @@ def render_project_card(pr: dict) -> str:
     if link_items:
         out.append(f'<div class="project__links">{links_list(link_items)}</div>')
 
-    return f'<article class="project" id="{E(pr.get("slug", ""))}">{"".join(out)}</article>'
+    skills_attr = project_skill_ids(pr, index or [])
+    attr = f' data-skills="{E(skills_attr)}"' if skills_attr else ""
+    return (f'<article class="project reveal" id="{E(pr.get("slug", ""))}"{attr}>'
+            f'{"".join(out)}</article>')
 
 
 def render_role(role: dict) -> str:
@@ -229,10 +315,15 @@ def render_role(role: dict) -> str:
 def render_skills(groups: list) -> str:
     out = []
     for g in groups:
+        items = []
+        for item in g.get("items", []):
+            ks = skill_keys(item)
+            key = sorted(ks)[0] if ks else ""
+            items.append(f'<li class="chip" data-skill="{E(key)}">{E(item)}</li>')
         out.append(
             '<div class="skill-group">'
             f'<h3 class="skill-group__name">{E(g.get("group", ""))}</h3>'
-            f'<ul class="skill-group__items">{chips(g.get("items", []))}</ul>'
+            f'<ul class="skill-group__items">{"".join(items)}</ul>'
             "</div>"
         )
     return f'<div class="skills">{"".join(out)}</div>'
@@ -278,22 +369,39 @@ def build_index(site: dict, css_href: str) -> str:
     nav_targets.append(("contact", labels.get("contact", "Contact")))
     nav = "".join(f'<a class="site-nav__link" href="#{sid}">{E(lbl)}</a>' for sid, lbl in nav_targets)
 
+    sindex = skill_index(site.get("skills", []))
+
+    aside = ""
+    if site.get("skills"):
+        aside = (
+            '<aside class="layout__aside" id="skills" aria-label="Skills">'
+            '<div class="aside__inner">'
+            f'<h2 class="aside__title">{E(labels.get("skills", "Skills"))}</h2>'
+            '<p class="aside__hint" data-default="What I would be comfortable being asked about.">'
+            "What I would be comfortable being asked about.</p>"
+            f'{render_skills(site["skills"])}'
+            "</div></aside>"
+        )
+
+    main_col = "".join([
+        section(labels.get("projects", "Selected work"),
+                "".join(render_project_card(pr, sindex) for pr in projects), "work"),
+        section(labels.get("experience", "Experience"),
+                "".join(render_role(r) for r in site.get("experience", [])), "experience"),
+        section(labels.get("education", "Education"),
+                render_edu(site.get("education", [])), "education"),
+    ])
+
     body = [
         '<a class="skip-link" href="#work">Skip to work</a>',
+        '<div class="scroll-progress" aria-hidden="true"><i></i></div>',
         '<header class="site-header">'
         f'<span class="site-header__name">{E(p.get("name", ""))}</span>'
         f'<nav class="site-nav" aria-label="Sections">{nav}</nav>'
         "</header>",
         "<main>",
         render_hero(site),
-        section(labels.get("projects", "Selected work"),
-                "".join(render_project_card(pr) for pr in projects), "work"),
-        section(labels.get("experience", "Experience"),
-                "".join(render_role(r) for r in site.get("experience", [])), "experience"),
-        section(labels.get("skills", "Skills"),
-                render_skills(site.get("skills", [])) if site.get("skills") else "", "skills"),
-        section(labels.get("education", "Education"),
-                render_edu(site.get("education", [])), "education"),
+        f'<div class="layout"><div class="layout__main">{main_col}</div>{aside}</div>',
         section(labels.get("contact", "Contact"),
                 f'<div class="contact"><div class="contact__links">'
                 f'{links_list(contact_links(p), cls="link-list contact__list")}</div></div>',
@@ -304,7 +412,8 @@ def build_index(site: dict, css_href: str) -> str:
 
     desc = site.get("meta_description") or p.get("tagline", "")
     h = head(f'{p.get("name", "")} — {p.get("job_title", "")}'.strip(" —"), desc, p,
-             p.get("site_url", ""), site.get("og_image"), css_href, person_jsonld(p))
+             p.get("site_url", ""), site.get("og_image"), css_href, person_jsonld(p),
+             js_href="site.js")
     return (f'<!doctype html>\n<html lang="{E(site.get("lang", "en"))}">\n<head>\n  {h}\n</head>\n'
             f'<body class="page-index">\n{"".join(body)}\n</body>\n</html>\n')
 
@@ -336,7 +445,7 @@ def build_case(pr: dict, site: dict) -> str:
                  paras(sec.get("body", ""))]
         for m in sec.get("media", []):
             inner.append(media_block(m))
-        out.append(f'<section class="case__section">{"".join(inner)}</section>')
+        out.append(f'<section class="case__section reveal">{"".join(inner)}</section>')
 
     out.append("</main>")
     footer_links = [{"label": "More work", "url": "../index.html#work"}]
@@ -355,7 +464,8 @@ def build_case(pr: dict, site: dict) -> str:
     # Employer-tier projects carry no media by rule; fall back to the site card so
     # their link previews are not blank.
     og = og or site.get("og_image")
-    h = head(f'{pr.get("title", "")} — {p.get("name", "")}', desc, p, "", og, "../site.css")
+    h = head(f'{pr.get("title", "")} — {p.get("name", "")}', desc, p, "", og, "../site.css",
+             js_href="../site.js")
     return (f'<!doctype html>\n<html lang="{E(site.get("lang", "en"))}">\n<head>\n  {h}\n</head>\n'
             f'<body class="page-case">\n{"".join(out)}\n</body>\n</html>\n')
 
@@ -395,6 +505,12 @@ def main() -> int:
 
     site = json.loads(Path(args.content).read_text(encoding="utf-8"))
 
+    # Inline the hero figure so it paints with the first byte and inherits the
+    # page's colour tokens; an <img> could do neither.
+    hero_svg = Path(args.css).with_name("hero.svg")
+    if hero_svg.exists():
+        site["_hero_svg"] = hero_svg.read_text(encoding="utf-8").strip()
+
     errs = validate(site)
     for e in errs:
         print(f"  ! {e}", file=sys.stderr)
@@ -416,6 +532,9 @@ def main() -> int:
     css = Path(args.css)
     if css.exists():
         shutil.copy(css, out / "site.css")
+    js = css.with_name("site.js")
+    if js.exists():
+        shutil.copy(js, out / "site.js")
     else:
         print(f"  ! no stylesheet at {css} — write one per the design plan", file=sys.stderr)
 
