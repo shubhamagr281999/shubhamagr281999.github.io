@@ -1,0 +1,6 @@
+# Nothing private should ever be in this repo, but belt and braces:
+work/
+dossiers/
+*.draft.json
+.DS_Store
+__pycache__/
