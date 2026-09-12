@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recursive Bayesian localisation, from scratch — Shubham Agrawal</title>
+  <meta name="description" content="The discrete Bayes filter built from nothing, to watch a belief distribution sharpen and blur as a robot senses and moves. Small on purpose.">
+  <meta property="og:title" content="Recursive Bayesian localisation, from scratch — Shubham Agrawal">
+  <meta property="og:description" content="The discrete Bayes filter built from nothing, to watch a belief distribution sharpen and blur as a robot senses and moves. Small on purpose.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:url" content="https://shubhamagr281999.github.io/projects/bayes-filter.html">
+  <link rel="canonical" href="https://shubhamagr281999.github.io/projects/bayes-filter.html">
+  <meta property="og:image" content="https://shubhamagr281999.github.io/assets/media/fig-bayes.jpg">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 32 32&#x27;%3E%3Crect width=&#x27;32&#x27; height=&#x27;32&#x27; fill=&#x27;%23FBFAF8&#x27;/%3E%3Cpath d=&#x27;M4 24h24M8 24V14M16 24V8M24 24v-6&#x27; stroke=&#x27;%239A4415&#x27; stroke-width=&#x27;3&#x27; fill=&#x27;none&#x27; stroke-linecap=&#x27;square&#x27;/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/site.css">
+  <script src="/site.js" defer></script>
+</head>
+<body class="page-case">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header"><a class="site-header__name" href="/">Shubham Agrawal</a><nav class="site-nav" aria-label="Sections"><a class="site-nav__link" href="/">Home</a><a class="site-nav__link is-active" href="/projects.html">Projects</a><a class="site-nav__link" href="/about.html">About</a><a class="site-nav__link" href="/resume.pdf">CV</a></nav></header>
+<main id="main"><a class="back" href="/projects.html">Back to all projects</a><header class="case__hero"><p class="case__period">May 2024</p><h1 class="case__title">Recursive Bayesian localisation, from scratch</h1><p class="case__hook">Every state estimator I have written since is this loop with more machinery bolted on. Building the smallest version by hand is what made the rest legible.</p><ul class="case__tags"><li class="tag">Perception</li></ul><p class="case__role"><span>My part</span> Solo.</p><div class="case__links"><a class="btn" href="https://github.com/shubhamagr281999/Understanding-Bayes-Filter" rel="noopener">Repository</a></div></header><div class="case__lead"><figure class="media"><img class="media__img" src="/assets/media/fig-bayes.jpg" alt="A corridor with three doors, and the belief distribution over position sharpening after each sense and move update" width="1200" height="800" loading="lazy" decoding="async"></figure></div><section class="section pao"><div class="pao__row"><h2 class="pao__label">Problem</h2><div class="pao__body"><p>A robot in a corridor knows what a door looks like but not where it is. Its belief about its own position has to survive ambiguous observations and grow less certain every time it moves.</p></div></div><div class="pao__row"><h2 class="pao__label">Approach</h2><div class="pao__body"><p>A discrete belief over positions, multiplied by an observation likelihood at each sense step and convolved with a motion kernel at each move step, normalised and plotted so the distribution is visible at every iteration.</p></div></div><div class="pao__row"><h2 class="pao__label">Outcome</h2><div class="pao__body"><p>It does what the textbook says: sensing sharpens the belief into peaks at each door, moving smears it out again, and repeated observations collapse it onto the true position. There is no benchmark here and it is not trying to be one.</p></div></div></section></main>
+<footer class="site-footer"><div class="site-footer__links"><a href="mailto:shubhamagr281999@gmail.com">shubhamagr281999@gmail.com</a><a href="https://www.linkedin.com/in/1-shubham-agrawal/" rel="noopener">LinkedIn</a><a href="https://github.com/shubhamagr281999" rel="noopener">GitHub</a><a href="/resume.pdf">CV</a></div><p class="site-footer__note">Shubham Agrawal &middot; Mumbai, India</p></footer>
+</body>
+</html>

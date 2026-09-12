@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Micromouse: flood fill in a maze — Shubham Agrawal</title>
+  <meta name="description" content="A maze-solving robot for the Techfest International Micromouse Challenge: explore an unknown maze, build the wall map, and flood fill to the fastest route home.">
+  <meta property="og:title" content="Micromouse: flood fill in a maze — Shubham Agrawal">
+  <meta property="og:description" content="A maze-solving robot for the Techfest International Micromouse Challenge: explore an unknown maze, build the wall map, and flood fill to the fastest route home.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:url" content="https://shubhamagr281999.github.io/projects/micromouse.html">
+  <link rel="canonical" href="https://shubhamagr281999.github.io/projects/micromouse.html">
+  <meta property="og:image" content="https://shubhamagr281999.github.io/assets/media/fig-micromouse.jpg">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 32 32&#x27;%3E%3Crect width=&#x27;32&#x27; height=&#x27;32&#x27; fill=&#x27;%23FBFAF8&#x27;/%3E%3Cpath d=&#x27;M4 24h24M8 24V14M16 24V8M24 24v-6&#x27; stroke=&#x27;%239A4415&#x27; stroke-width=&#x27;3&#x27; fill=&#x27;none&#x27; stroke-linecap=&#x27;square&#x27;/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/site.css">
+  <script src="/site.js" defer></script>
+</head>
+<body class="page-case">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header"><a class="site-header__name" href="/">Shubham Agrawal</a><nav class="site-nav" aria-label="Sections"><a class="site-nav__link" href="/">Home</a><a class="site-nav__link is-active" href="/projects.html">Projects</a><a class="site-nav__link" href="/about.html">About</a><a class="site-nav__link" href="/resume.pdf">CV</a></nav></header>
+<main id="main"><a class="back" href="/projects.html">Back to all projects</a><header class="case__hero"><p class="case__period">Dec 2021</p><h1 class="case__title">Micromouse: flood fill in a maze</h1><p class="case__hook">A micromouse has to solve the maze and then drive it fast, and those two goals want different things from the same robot.</p><ul class="case__tags"><li class="tag">Embedded</li><li class="tag">Motion Planning</li></ul><p class="case__role"><span>My part</span> Team entry, built on a competition-supplied simulation template.</p></header><div class="case__lead"><figure class="media"><img class="media__img" src="/assets/media/fig-micromouse.jpg" alt="A maze with cells shaded by their distance to the centre, and the shortest route those distances induce" width="1200" height="800" loading="lazy" decoding="async"></figure></div><section class="section pao"><div class="pao__row"><h2 class="pao__label">Problem</h2><div class="pao__body"><p>Explore an unknown maze from a corner, discover walls as sensors reach them, and then return to the centre along the shortest route the map allows.</p></div></div><div class="pao__row"><h2 class="pao__label">Approach</h2><div class="pao__body"><p>Flood fill: assign every cell its distance to the goal given the walls known so far, re-run the fill whenever a new wall is discovered, and drive downhill. It is the standard micromouse answer because it gives a correct route from partial knowledge.</p></div></div><div class="pao__row"><h2 class="pao__label">Outcome</h2><div class="pao__body"><p>An entry for the 2021 challenge. The repository is honestly a competition snapshot rather than a finished artefact, which is why there is no code link here.</p></div></div></section></main>
+<footer class="site-footer"><div class="site-footer__links"><a href="mailto:shubhamagr281999@gmail.com">shubhamagr281999@gmail.com</a><a href="https://www.linkedin.com/in/1-shubham-agrawal/" rel="noopener">LinkedIn</a><a href="https://github.com/shubhamagr281999" rel="noopener">GitHub</a><a href="/resume.pdf">CV</a></div><p class="site-footer__note">Shubham Agrawal &middot; Mumbai, India</p></footer>
+</body>
+</html>

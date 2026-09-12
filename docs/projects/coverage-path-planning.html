@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Exact cell decomposition for coverage — Shubham Agrawal</title>
+  <meta name="description" content="Skipped sampling planners entirely and implemented exact Morse cell decomposition in C++ over circular obstacles, so every gap gets planned through regardless of width.">
+  <meta property="og:title" content="Exact cell decomposition for coverage — Shubham Agrawal">
+  <meta property="og:description" content="Skipped sampling planners entirely and implemented exact Morse cell decomposition in C++ over circular obstacles, so every gap gets planned through regardless of width.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:url" content="https://shubhamagr281999.github.io/projects/coverage-path-planning.html">
+  <link rel="canonical" href="https://shubhamagr281999.github.io/projects/coverage-path-planning.html">
+  <meta property="og:image" content="https://shubhamagr281999.github.io/assets/media/fig-coverage.jpg">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 32 32&#x27;%3E%3Crect width=&#x27;32&#x27; height=&#x27;32&#x27; fill=&#x27;%23FBFAF8&#x27;/%3E%3Cpath d=&#x27;M4 24h24M8 24V14M16 24V8M24 24v-6&#x27; stroke=&#x27;%239A4415&#x27; stroke-width=&#x27;3&#x27; fill=&#x27;none&#x27; stroke-linecap=&#x27;square&#x27;/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/site.css">
+  <script src="/site.js" defer></script>
+</head>
+<body class="page-case">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header"><a class="site-header__name" href="/">Shubham Agrawal</a><nav class="site-nav" aria-label="Sections"><a class="site-nav__link" href="/">Home</a><a class="site-nav__link is-active" href="/projects.html">Projects</a><a class="site-nav__link" href="/about.html">About</a><a class="site-nav__link" href="/resume.pdf">CV</a></nav></header>
+<main id="main"><a class="back" href="/projects.html">Back to all projects</a><header class="case__hero"><p class="case__period">2022</p><h1 class="case__title">Exact cell decomposition for coverage</h1><p class="case__hook">Sampling planners burn memory on samples and start missing narrow gaps as obstacle density rises. Exact decomposition does not: it plans through every gap regardless of width, which is the guarantee I wanted.</p><ul class="case__tags"><li class="tag">Motion Planning</li></ul><p class="case__role"><span>My part</span> Solo.</p></header><div class="case__lead"><figure class="media"><img class="media__img" src="/assets/media/fig-coverage.jpg" alt="Eleven circular obstacles with vertical sweep lines, the free cells shaded, and an adjacency graph linking their centres" width="1200" height="800" loading="lazy" decoding="async"></figure></div><section class="section pao"><div class="pao__row"><h2 class="pao__label">Problem</h2><div class="pao__body"><p>Plan a route through a workspace of known circular obstacles. A probabilistic roadmap would have been the obvious answer, but its performance depends on sampling density and it can miss a narrow passage entirely. I had already built an RRT for a 2-DoF arm, so I knew what I would be giving up.</p></div></div><div class="pao__row"><h2 class="pao__label">Approach</h2><div class="pao__body"><p>A sweep line over the critical x-coordinates of every circle, splitting the free space into trapezoidal cells bounded by obstacle arcs, and an adjacency graph built as cells open and close. Travelling between two points becomes: find the cell containing each, then walk the graph through the midpoints of shared edges.</p></div></div><div class="pao__row"><h2 class="pao__label">Outcome</h2><div class="pao__body"><p>It plans through every gap in the workspace. Two honest caveats: the graph search over the cell adjacency is a breadth-first cost relaxation rather than the A* the README claims, so the route is not guaranteed shortest; and despite the repository name I did not implement the complete-coverage traversal, which my own notes admit.</p></div></div></section></main>
+<footer class="site-footer"><div class="site-footer__links"><a href="mailto:shubhamagr281999@gmail.com">shubhamagr281999@gmail.com</a><a href="https://www.linkedin.com/in/1-shubham-agrawal/" rel="noopener">LinkedIn</a><a href="https://github.com/shubhamagr281999" rel="noopener">GitHub</a><a href="/resume.pdf">CV</a></div><p class="site-footer__note">Shubham Agrawal &middot; Mumbai, India</p></footer>
+</body>
+</html>

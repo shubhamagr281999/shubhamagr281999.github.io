@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""Render content/site.json into a static site in dist/.
+"""Render content/site.json into a static multi-page site.
 
-Standard library only, no build toolchain — the site must still build in three years
-without a dependency archaeology session.
+Standard library only, no build toolchain — the site must still build in three
+years without a dependency archaeology session.
 
-Usage:
-    python scripts/build_site.py [--content content/site.json] [--out dist]
-                                 [--css assets/site.css] [--media assets/media]
+    python3 scripts/build_site.py --out docs
 
 Emits:
-    dist/index.html
-    dist/projects/<slug>.html   for each project with "deep_dive": true
-    dist/site.css               copied from --css
-    dist/assets/media/...       copied from --media
-    dist/.nojekyll              so GitHub Pages serves files starting with _
+    docs/index.html              home: hero, videos, featured work, about teaser
+    docs/projects.html           every project, filterable by tag
+    docs/about.html              bio + experience & education timeline
+    docs/projects/<slug>.html    a detail page per project
+    docs/site.css, docs/site.js  copied from assets/
+    docs/assets/media/...        copied from assets/media/
+    docs/.nojekyll               so Pages serves files starting with _
+
+Paths in content are root-relative ("/assets/..."). This is a user Pages site
+served at the domain root, so they resolve identically from every page depth.
 """
 
 from __future__ import annotations
@@ -26,20 +29,66 @@ import shutil
 import sys
 from pathlib import Path
 
-# ---------------------------------------------------------------- small helpers
-
 E = html.escape
 LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
 
 
+
+# ------------------------------------------------- intrinsic image dimensions
+#
+# Declared width/height let the browser reserve the right box before the image
+# arrives. Read from the file header rather than hardcoded, so a replaced asset
+# never silently disagrees with its markup. Stdlib only, by design.
+
+_DIM_CACHE: dict = {}
+
+
+def image_size(src: str, assets: Path) -> tuple:
+    """(width, height) for a local /assets/... image, or (None, None)."""
+    if not src.startswith("/assets/"):
+        return (None, None)
+    if src in _DIM_CACHE:
+        return _DIM_CACHE[src]
+    path = assets / src.split("/assets/", 1)[1]
+    dim = (None, None)
+    try:
+        b = path.read_bytes()
+        if b[:8] == b"\x89PNG\r\n\x1a\n":
+            dim = (int.from_bytes(b[16:20], "big"), int.from_bytes(b[20:24], "big"))
+        elif b[:3] == b"GIF":
+            dim = (int.from_bytes(b[6:8], "little"), int.from_bytes(b[8:10], "little"))
+        elif b[:2] == b"\xff\xd8":
+            i = 2
+            while i < len(b) - 9:
+                if b[i] != 0xFF:
+                    i += 1
+                    continue
+                m = b[i + 1]
+                if m in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
+                         0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+                    dim = (int.from_bytes(b[i + 7:i + 9], "big"),
+                           int.from_bytes(b[i + 5:i + 7], "big"))
+                    break
+                if m in (0xD8, 0xD9) or 0xD0 <= m <= 0xD7:
+                    i += 2
+                else:
+                    i += 2 + int.from_bytes(b[i + 2:i + 4], "big")
+    except Exception:
+        pass
+    _DIM_CACHE[src] = dim
+    return dim
+
+
+ASSETS = Path("assets")
+
+
+# ---------------------------------------------------------------- text helpers
+
 def rich(text: str) -> str:
-    """Escape text, then re-enable [label](url) inline links."""
-    out = E(text or "")
-    return LINK_RE.sub(r'<a href="\2">\1</a>', out)
+    return LINK_RE.sub(r'<a href="\2">\1</a>', E(text or ""))
 
 
 def paras(text: str, cls: str = "") -> str:
-    """Blank-line separated text -> <p> blocks."""
     if not text:
         return ""
     attr = f' class="{cls}"' if cls else ""
@@ -47,127 +96,36 @@ def paras(text: str, cls: str = "") -> str:
     return "\n".join(f"<p{attr}>{rich(b)}</p>" for b in blocks)
 
 
-def tag(name: str, inner: str, **attrs) -> str:
-    bits = "".join(f' {k.rstrip("_").replace("_", "-")}="{E(str(v))}"' for k, v in attrs.items() if v)
-    return f"<{name}{bits}>{inner}</{name}>"
-
-
-def chips(items, cls="chip") -> str:
-    if not items:
-        return ""
-    return "".join(f'<li class="{cls}">{E(i)}</li>' for i in items)
-
-
-# ------------------------------------------------- linking projects to skills
-#
-# The skills panel highlights the entries a project actually uses as you scroll
-# past it. The matching is done HERE, at build time, so the browser only has to
-# toggle a class — no fuzzy string matching at runtime, and the result is
-# inspectable in the generated HTML.
-
-def skill_keys(label: str) -> set:
-    """Normalise a stack or skill label into comparable tokens.
-
-    'C++17 / Eigen' -> {'c17', 'eigen'};  'MuJoCo' -> {'mujoco'}
-    Parenthesised asides count too, so 'VLA models (Pi-0.5, OpenVLA-OFT)'
-    matches a project listing 'OpenVLA-OFT'.
-    """
-    parts = re.split(r"[/,()]| and ", label.lower())
-    out = set()
-    for p in parts:
-        k = re.sub(r"[^a-z0-9]", "", p)
-        if len(k) > 2:
-            out.add(k)
-    return out
-
-
-def skill_index(groups: list) -> list:
-    """[(key, label)] for every skill item, key being its first token."""
-    out = []
-    for g in groups or []:
-        for item in g.get("items", []):
-            ks = skill_keys(item)
-            if ks:
-                out.append((sorted(ks)[0], item, ks))
-    return out
-
-
-def project_skill_ids(pr: dict, index: list) -> str:
-    """Space-separated skill keys this project's stack touches."""
-    stack_tokens = set()
-    for s in pr.get("stack", []):
-        stack_tokens |= skill_keys(s)
-    hit = [key for key, _label, ks in index if ks & stack_tokens]
-    return " ".join(sorted(set(hit)))
-
-
-def links_list(items, cls="link-list") -> str:
-    if not items:
-        return ""
-    out = []
-    for item in items:
-        li_cls = "link-list__item"
-        if item.get("primary"):
-            li_cls += " link-list__item--primary"
-        rel = ' rel="noopener"' if item.get("url", "").startswith("http") else ""
-        out.append(
-            f'<li class="{li_cls}"><a href="{E(item["url"])}"{rel}>{E(item["label"])}</a></li>'
-        )
-    return f'<ul class="{cls}">' + "".join(out) + "</ul>"
-
-
-def media_block(m: dict, lazy: bool = True) -> str:
-    src = E(m.get("src", ""))
-    caption = m.get("caption", "")
-    alt = m.get("alt") or caption
-    dims = ""
-    if m.get("width"):
-        dims += f' width="{E(str(m["width"]))}"'
-    if m.get("height"):
-        dims += f' height="{E(str(m["height"]))}"'
-
-    if m.get("type") == "video" or src.endswith((".mp4", ".webm")):
-        poster = f' poster="{E(m["poster"])}"' if m.get("poster") else ""
-        inner = (
-            f'<video class="media__video" src="{src}"{poster}{dims} '
-            f'autoplay loop muted playsinline preload="metadata" '
-            f'aria-label="{E(alt)}"></video>'
-        )
-    else:
-        loading = ' loading="lazy" decoding="async"' if lazy else ""
-        inner = f'<img class="media__img" src="{src}" alt="{E(alt)}"{dims}{loading}>'
-
-    cap = f'<figcaption class="media__caption">{rich(caption)}</figcaption>' if caption else ""
-    return f'<figure class="media">{inner}{cap}</figure>'
+def slugify(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
 # ---------------------------------------------------------------- page scaffold
 
-def head(title: str, description: str, person: dict, page_url: str, og_image: str | None,
-         css_href: str, jsonld: str | None = None, js_href: str | None = None) -> str:
+NAV = [("/", "Home"), ("/projects.html", "Projects"), ("/about.html", "About")]
+
+
+def head(title: str, desc: str, person: dict, og_image: str | None,
+         canonical: str = "", jsonld: str | None = None) -> str:
     parts = [
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
-        # Flag JS before first paint so reveal animations never leave content
-        # hidden for a reader without JavaScript.
-        '<script>document.documentElement.classList.add("js")</script>',
         f"<title>{E(title)}</title>",
-        f'<meta name="description" content="{E(description)}">',
+        f'<meta name="description" content="{E(desc)}">',
         f'<meta property="og:title" content="{E(title)}">',
-        f'<meta property="og:description" content="{E(description)}">',
+        f'<meta property="og:description" content="{E(desc)}">',
         '<meta property="og:type" content="website">',
         '<meta name="twitter:card" content="summary_large_image">',
     ]
-    if page_url:
-        parts.append(f'<meta property="og:url" content="{E(page_url)}">')
-        parts.append(f'<link rel="canonical" href="{E(page_url)}">')
+    if canonical:
+        parts.append(f'<meta property="og:url" content="{E(canonical)}">')
+        parts.append(f'<link rel="canonical" href="{E(canonical)}">')
     if og_image:
         parts.append(f'<meta property="og:image" content="{E(og_image)}">')
     if person.get("favicon"):
         parts.append(f'<link rel="icon" href="{E(person["favicon"])}">')
-    parts.append(f'<link rel="stylesheet" href="{E(css_href)}">')
-    if js_href:
-        parts.append(f'<script src="{E(js_href)}" defer></script>')
+    parts.append('<link rel="stylesheet" href="/site.css">')
+    parts.append('<script src="/site.js" defer></script>')
     if jsonld:
         parts.append(f'<script type="application/ld+json">{jsonld}</script>')
     return "\n  ".join(parts)
@@ -175,7 +133,7 @@ def head(title: str, description: str, person: dict, page_url: str, og_image: st
 
 def person_jsonld(person: dict) -> str:
     same_as = [u for u in (person.get("linkedin"), person.get("github"),
-                           person.get("huggingface"), person.get("scholar")) if u]
+                           person.get("scholar")) if u]
     data = {
         "@context": "https://schema.org",
         "@type": "Person",
@@ -188,257 +146,324 @@ def person_jsonld(person: dict) -> str:
     return json.dumps({k: v for k, v in data.items() if v}, ensure_ascii=False)
 
 
-def contact_links(person: dict, primary_first: bool = True) -> list:
-    out = []
-    if person.get("email"):
-        out.append({"label": person["email"], "url": f"mailto:{person['email']}", "primary": True})
-    for key, label in (("linkedin", "LinkedIn"), ("github", "GitHub"),
-                       ("huggingface", "Hugging Face"), ("scholar", "Scholar")):
-        if person.get(key):
-            out.append({"label": label, "url": person[key]})
+def site_header(active: str, person: dict) -> str:
+    links = []
+    for href, lbl in NAV:
+        cls = "site-nav__link" + (" is-active" if href == active else "")
+        links.append(f'<a class="{cls}" href="{href}">{E(lbl)}</a>')
     if person.get("resume"):
-        out.append({"label": "Résumé (PDF)", "url": person["resume"], "primary": primary_first})
-    return out
-
-
-# ---------------------------------------------------------------- sections
-
-def render_stats(stats: list) -> str:
-    if not stats:
-        return ""
-    items = "".join(
-        '<div class="stat">'
-        f'<span class="stat__value">{E(str(s.get("value", "")))}</span>'
-        f'<span class="stat__label">{E(s.get("label", ""))}</span>'
-        "</div>"
-        for s in stats
-    )
-    return f'<div class="hero__stats">{items}</div>'
-
-
-def render_hero(site: dict) -> str:
-    p = site["person"]
-    bits = [f'<h1 class="hero__name">{E(p.get("name", ""))}</h1>']
-    if p.get("tagline"):
-        bits.append(f'<p class="hero__tagline">{rich(p["tagline"])}</p>')
-    if site.get("intro"):
-        intro = site["intro"]
-        text = "\n\n".join(intro) if isinstance(intro, list) else intro
-        bits.append(f'<div class="hero__intro">{paras(text)}</div>')
-    bits.append(f'<nav class="hero__links" aria-label="Contact">{links_list(contact_links(p))}</nav>')
-
-    viz = ""
-    if site.get("_hero_svg"):
-        viz = f'<div class="hero__viz">{site["_hero_svg"]}</div>'
-    elif site.get("hero_media"):
-        viz = f'<div class="hero__media">{media_block(site["hero_media"], lazy=False)}</div>'
-
-    cue = ('<a class="hero__cue" href="#work">'
-           '<span class="hero__cue-text">See the work</span>'
-           '<span class="hero__cue-arrow" aria-hidden="true"></span></a>')
-
-    return (f'<header class="hero">'
-            f'<div class="hero__grid"><div class="hero__text">{"".join(bits)}</div>{viz}</div>'
-            f'{render_stats(site.get("hero_stats"))}{cue}</header>')
-
-
-def render_project_card(pr: dict, index: list | None = None) -> str:
-    head_bits = [f'<h3 class="project__title">{E(pr.get("title", ""))}</h3>']
-    if pr.get("period"):
-        head_bits.append(f'<p class="project__period">{E(pr["period"])}</p>')
-    out = [f'<div class="project__head">{"".join(head_bits)}</div>']
-
-    if pr.get("hook"):
-        out.append(f'<p class="project__hook">{rich(pr["hook"])}</p>')
-
-    if pr.get("lead_media"):
-        out.append(f'<div class="project__media">{media_block(pr["lead_media"])}</div>')
-
-    if pr.get("stack"):
-        out.append(f'<ul class="project__stack">{chips(pr["stack"])}</ul>')
-
-    # Problem / Approach / Outcome live inside <details>: present in the HTML for
-    # search engines and link previews, collapsed for the scanner, and keyboard
-    # operable with no JavaScript at all.
-    blocks = []
-    for label, key in (("Problem", "problem"), ("Approach", "approach"), ("Outcome", "outcome")):
-        if pr.get(key):
-            blocks.append(
-                '<div class="project__block">'
-                f'<h4 class="project__block-label">{label}</h4>'
-                f'<div class="project__block-body">{paras(pr[key])}</div>'
-                "</div>"
-            )
-    if blocks:
-        out.append(
-            '<details class="project__detail">'
-            '<summary class="project__toggle">'
-            '<span class="project__toggle-label" data-open="Hide the detail"'
-            ' data-closed="Problem, approach, outcome">Problem, approach, outcome</span>'
-            '<span class="project__toggle-icon" aria-hidden="true"></span>'
-            "</summary>"
-            f'<div class="project__blocks">{"".join(blocks)}</div>'
-            "</details>"
-        )
-
-    link_items = list(pr.get("links", []))
-    if pr.get("deep_dive"):
-        link_items = [{"label": "Read the case study", "url": f'projects/{pr["slug"]}.html',
-                       "primary": True}] + link_items
-    if link_items:
-        out.append(f'<div class="project__links">{links_list(link_items)}</div>')
-
-    skills_attr = project_skill_ids(pr, index or [])
-    attr = f' data-skills="{E(skills_attr)}"' if skills_attr else ""
-    return (f'<article class="project reveal" id="{E(pr.get("slug", ""))}"{attr}>'
-            f'{"".join(out)}</article>')
-
-
-def render_role(role: dict) -> str:
-    head_bits = [
-        f'<h3 class="role__org">{E(role.get("org", ""))}</h3>',
-        f'<p class="role__title">{E(role.get("title", ""))}</p>',
-    ]
-    if role.get("period"):
-        head_bits.append(f'<p class="role__period">{E(role["period"])}</p>')
-    out = [f'<div class="role__head">{"".join(head_bits)}</div>']
-    if role.get("summary"):
-        out.append(f'<div class="role__summary">{paras(role["summary"])}</div>')
-    if role.get("highlights"):
-        items = "".join(f"<li>{rich(h)}</li>" for h in role["highlights"])
-        out.append(f'<ul class="role__highlights">{items}</ul>')
-    if role.get("stack"):
-        out.append(f'<ul class="role__stack">{chips(role["stack"])}</ul>')
-    return f'<article class="role">{"".join(out)}</article>'
-
-
-def render_skills(groups: list) -> str:
-    out = []
-    for g in groups:
-        items = []
-        for item in g.get("items", []):
-            ks = skill_keys(item)
-            key = sorted(ks)[0] if ks else ""
-            items.append(f'<li class="chip" data-skill="{E(key)}">{E(item)}</li>')
-        out.append(
-            '<div class="skill-group">'
-            f'<h3 class="skill-group__name">{E(g.get("group", ""))}</h3>'
-            f'<ul class="skill-group__items">{"".join(items)}</ul>'
-            "</div>"
-        )
-    return f'<div class="skills">{"".join(out)}</div>'
-
-
-def render_edu(items: list) -> str:
-    out = []
-    for e in items:
-        bits = [f'<h3 class="edu__institution">{E(e.get("institution", ""))}</h3>']
-        if e.get("degree"):
-            bits.append(f'<p class="edu__degree">{E(e["degree"])}</p>')
-        if e.get("period"):
-            bits.append(f'<p class="edu__period">{E(e["period"])}</p>')
-        if e.get("note"):
-            bits.append(f'<p class="edu__note">{rich(e["note"])}</p>')
-        out.append(f'<article class="edu">{"".join(bits)}</article>')
-    return "".join(out)
-
-
-def section(title: str, body: str, sid: str) -> str:
-    if not body:
-        return ""
+        links.append(f'<a class="site-nav__link" href="{E(person["resume"])}">CV</a>')
     return (
-        f'<section class="section" id="{E(sid)}">'
-        f'<h2 class="section__title">{E(title)}</h2>'
-        f'<div class="section__body">{body}</div>'
-        "</section>"
+        '<header class="site-header">'
+        f'<a class="site-header__name" href="/">{E(person.get("name", ""))}</a>'
+        f'<nav class="site-nav" aria-label="Sections">{"".join(links)}</nav>'
+        "</header>"
     )
+
+
+def site_footer(person: dict) -> str:
+    bits = []
+    if person.get("email"):
+        bits.append(f'<a href="mailto:{E(person["email"])}">{E(person["email"])}</a>')
+    for key, lbl in (("linkedin", "LinkedIn"), ("github", "GitHub"), ("scholar", "Scholar")):
+        if person.get(key):
+            bits.append(f'<a href="{E(person[key])}" rel="noopener">{E(lbl)}</a>')
+    if person.get("resume"):
+        bits.append(f'<a href="{E(person["resume"])}">CV</a>')
+    return (
+        '<footer class="site-footer">'
+        f'<div class="site-footer__links">{"".join(bits)}</div>'
+        f'<p class="site-footer__note">{E(person.get("name", ""))} &middot; '
+        f'{E(person.get("location", ""))}</p>'
+        "</footer>"
+    )
+
+
+def page(body: str, *, title: str, desc: str, person: dict, active: str,
+         og_image: str | None = None, canonical: str = "", body_class: str = "",
+         jsonld: str | None = None, lang: str = "en") -> str:
+    h = head(title, desc, person, og_image, canonical, jsonld)
+    return (f'<!doctype html>\n<html lang="{E(lang)}">\n<head>\n  {h}\n</head>\n'
+            f'<body class="{E(body_class)}">\n'
+            '<a class="skip-link" href="#main">Skip to content</a>\n'
+            f'{site_header(active, person)}\n'
+            f'<main id="main">{body}</main>\n'
+            f'{site_footer(person)}\n</body>\n</html>\n')
+
+
+# ---------------------------------------------------------------- components
+
+def project_card(pr: dict, *, reveal: bool = True, eager: bool = False) -> str:
+    slug = pr.get("slug", "")
+    href = f"/projects/{slug}.html"
+    thumb = pr.get("thumb")
+    tags = pr.get("tags", [])
+    data_tags = " ".join(slugify(t) for t in tags)
+
+    if thumb:
+        # The first cards are above the fold; lazy-loading them only delays the
+        # largest paint.
+        load = "" if eager else ' loading="lazy"'
+        w, h = image_size(thumb, ASSETS)
+        dims = f' width="{w}" height="{h}"' if w else ""
+        media = (f'<img class="card__img" src="{E(thumb)}" '
+                 f'alt="{E(pr.get("thumb_alt", ""))}"{dims}{load} decoding="async">')
+    else:
+        # Employer-tier projects carry no imagery by disclosure rule. Give the card
+        # a deliberate typographic face rather than a broken-looking gap.
+        initials = "".join(w[0] for w in pr.get("title", "?").split()[:2]).upper()
+        media = f'<span class="card__mark" aria-hidden="true">{E(initials)}</span>'
+
+    tag_html = "".join(f'<span class="tag">{E(t)}</span>' for t in tags)
+    cls = "card reveal" if reveal else "card"
+    return (
+        f'<article class="{cls}" data-tags="{E(data_tags)}">'
+        f'<a class="card__link" href="{href}">'
+        f'<span class="card__media">{media}</span>'
+        '<span class="card__body">'
+        f'<span class="card__period">{E(pr.get("period", ""))}</span>'
+        f'<span class="card__title">{E(pr.get("title", ""))}</span>'
+        f'<span class="card__blurb">{E(pr.get("blurb", ""))}</span>'
+        f'<span class="card__tags">{tag_html}</span>'
+        "</span></a></article>"
+    )
+
+
+def video_block(v: dict) -> str:
+    """A local clip, or a YouTube id rendered as a click-through facade so the
+    page never ships a third-party player it does not need."""
+    title = v.get("title", "")
+    if v.get("youtube"):
+        yid = v["youtube"]
+        poster = v.get("poster") or f"https://i.ytimg.com/vi/{yid}/hqdefault.jpg"
+        return (
+            f'<a class="vid vid--yt" href="https://www.youtube.com/watch?v={E(yid)}" '
+            f'rel="noopener">'
+            f'<img class="vid__img" src="{E(poster)}" alt="{E(title)}" loading="lazy">'
+            '<span class="vid__play" aria-hidden="true"></span>'
+            f'<span class="vid__title">{E(title)}</span></a>'
+        )
+    src = v.get("src", "")
+    poster = f' poster="{E(v["poster"])}"' if v.get("poster") else ""
+    return (
+        '<figure class="vid">'
+        f'<video class="vid__video" src="{E(src)}"{poster} autoplay loop muted '
+        f'playsinline preload="metadata" aria-label="{E(title)}"></video>'
+        f'<figcaption class="vid__title">{E(title)}</figcaption>'
+        "</figure>"
+    )
+
+
+def video_placeholder(v: dict) -> str:
+    return (
+        '<div class="vid vid--empty">'
+        f'<span class="vid__slot">{E(v.get("title", "clip"))}</span>'
+        f'<span class="vid__hint">{E(v.get("hint", ""))}</span>'
+        "</div>"
+    )
+
+
+def media_block(m: dict) -> str:
+    src = E(m.get("src", ""))
+    alt = m.get("alt") or m.get("caption", "")
+    dims = ""
+    if m.get("width"):
+        dims += f' width="{E(str(m["width"]))}"'
+    if m.get("height"):
+        dims += f' height="{E(str(m["height"]))}"'
+    if not dims:
+        w, h = image_size(m.get("src", ""), ASSETS)
+        if w:
+            dims = f' width="{w}" height="{h}"'
+    if m.get("type") == "video" or src.endswith((".mp4", ".webm")):
+        poster = f' poster="{E(m["poster"])}"' if m.get("poster") else ""
+        inner = (f'<video class="media__video" src="{src}"{poster}{dims} autoplay loop '
+                 f'muted playsinline preload="metadata" aria-label="{E(alt)}"></video>')
+    else:
+        inner = (f'<img class="media__img" src="{src}" alt="{E(alt)}"{dims} '
+                 f'loading="lazy" decoding="async">')
+    cap = (f'<figcaption class="media__caption">{rich(m["caption"])}</figcaption>'
+           if m.get("caption") else "")
+    return f'<figure class="media">{inner}{cap}</figure>'
 
 
 # ---------------------------------------------------------------- pages
 
-def build_index(site: dict, css_href: str) -> str:
+def build_home(site: dict) -> str:
     p = site["person"]
-    labels = site.get("section_titles", {})
+    hero = site.get("hero", {})
     projects = site.get("projects", [])
+    featured = [pr for pr in projects if pr.get("featured")][:3]
 
-    nav_targets = [("work", labels.get("projects", "Selected work"))]
-    if site.get("experience"):
-        nav_targets.append(("experience", labels.get("experience", "Experience")))
-    if site.get("skills"):
-        nav_targets.append(("skills", labels.get("skills", "Skills")))
-    nav_targets.append(("contact", labels.get("contact", "Contact")))
-    nav = "".join(f'<a class="site-nav__link" href="#{sid}">{E(lbl)}</a>' for sid, lbl in nav_targets)
+    bits = ['<section class="hero">',
+            f'<h1 class="hero__headline">{rich(hero.get("headline", ""))}</h1>']
+    if hero.get("sub"):
+        bits.append(f'<p class="hero__sub">{rich(hero["sub"])}</p>')
+    if hero.get("buttons"):
+        bits.append('<div class="hero__links">' + "".join(
+            f'<a class="btn{" btn--primary" if b.get("primary") else ""}" '
+            f'href="{E(b["url"])}">{E(b["label"])}</a>' for b in hero["buttons"]) + "</div>")
+    bits.append("</section>")
 
-    sindex = skill_index(site.get("skills", []))
+    if site.get("videos"):
+        cells = [video_block(v) if (v.get("src") or v.get("youtube")) else video_placeholder(v)
+                 for v in site["videos"][:4]]
+        bits.append(f'<section class="section reveal"><div class="vid-grid">'
+                    f'{"".join(cells)}</div></section>')
 
-    aside = ""
-    if site.get("skills"):
-        aside = (
-            '<aside class="layout__aside" id="skills" aria-label="Skills">'
-            '<div class="aside__inner">'
-            f'<h2 class="aside__title">{E(labels.get("skills", "Skills"))}</h2>'
-            '<p class="aside__hint" data-default="What I would be comfortable being asked about.">'
-            "What I would be comfortable being asked about.</p>"
-            f'{render_skills(site["skills"])}'
-            "</div></aside>"
-        )
+    bits.append(
+        '<section class="section reveal">'
+        '<div class="section__head"><h2 class="section__title">Featured projects</h2>'
+        '<a class="section__more" href="/projects.html">View all &rarr;</a></div>'
+        f'<div class="card-grid">'
+        + "".join(project_card(pr, eager=(i < 2))
+                   for i, pr in enumerate(featured)) + "</div>"
+        "</section>"
+    )
 
-    main_col = "".join([
-        section(labels.get("projects", "Selected work"),
-                "".join(render_project_card(pr, sindex) for pr in projects), "work"),
-        section(labels.get("experience", "Experience"),
-                "".join(render_role(r) for r in site.get("experience", [])), "experience"),
-        section(labels.get("education", "Education"),
-                render_edu(site.get("education", [])), "education"),
-    ])
+    about = site.get("about", {})
+    photo = ""
+    if p.get("photo"):
+        photo = (f'<img class="portrait" src="{E(p["photo"])}" '
+                 f'alt="Portrait of {E(p.get("name", ""))}">')
+    teaser = about.get("teaser") or (about.get("bio", [""])[0] if about.get("bio") else "")
+    bits.append(
+        f'<section class="section reveal about-teaser{" about-teaser--photo" if photo else ""}">'
+        f'{photo}<div class="about-teaser__text">'
+        '<h2 class="section__title">About</h2>'
+        f'{paras(teaser)}'
+        '<a class="section__more" href="/about.html">More about me &rarr;</a>'
+        "</div></section>"
+    )
 
-    body = [
-        '<a class="skip-link" href="#work">Skip to work</a>',
-        '<div class="scroll-progress" aria-hidden="true"><i></i></div>',
-        '<header class="site-header">'
-        f'<span class="site-header__name">{E(p.get("name", ""))}</span>'
-        f'<nav class="site-nav" aria-label="Sections">{nav}</nav>'
-        "</header>",
-        "<main>",
-        render_hero(site),
-        f'<div class="layout"><div class="layout__main">{main_col}</div>{aside}</div>',
-        section(labels.get("contact", "Contact"),
-                f'<div class="contact"><div class="contact__links">'
-                f'{links_list(contact_links(p), cls="link-list contact__list")}</div></div>',
-                "contact"),
-        "</main>",
-        f'<footer class="site-footer"><p>{E(site.get("footer", ""))}</p></footer>',
-    ]
+    return page("".join(bits), title=f'{p.get("name", "")} — {p.get("job_title", "")}',
+                desc=site.get("meta_description", ""), person=p, active="/",
+                og_image=site.get("og_image"), canonical=p.get("site_url", ""),
+                body_class="page-home", jsonld=person_jsonld(p))
 
-    desc = site.get("meta_description") or p.get("tagline", "")
-    h = head(f'{p.get("name", "")} — {p.get("job_title", "")}'.strip(" —"), desc, p,
-             p.get("site_url", ""), site.get("og_image"), css_href, person_jsonld(p),
-             js_href="site.js")
-    return (f'<!doctype html>\n<html lang="{E(site.get("lang", "en"))}">\n<head>\n  {h}\n</head>\n'
-            f'<body class="page-index">\n{"".join(body)}\n</body>\n</html>\n')
+
+def build_projects(site: dict) -> str:
+    p = site["person"]
+    projects = site.get("projects", [])
+    tags = []
+    for pr in projects:
+        for t in pr.get("tags", []):
+            if t not in tags:
+                tags.append(t)
+    tags.sort()
+
+    filters = ['<button class="filter is-on" data-filter="all" type="button">All</button>']
+    filters += [f'<button class="filter" data-filter="{E(slugify(t))}" type="button">{E(t)}</button>'
+                for t in tags]
+
+    body = (
+        '<section class="section">'
+        '<h1 class="page-title">Projects</h1>'
+        f'<p class="page-lede">{E(site.get("projects_lede", ""))}</p>'
+        '<div class="filters" role="group" aria-label="Filter projects by topic">'
+        f'{"".join(filters)}</div>'
+        '<p class="filter-count" aria-live="polite"></p>'
+        f'<div class="card-grid" id="project-grid">'
+        + "".join(project_card(pr, reveal=False, eager=(i < 4))
+                    for i, pr in enumerate(projects)) + "</div>"
+        "</section>"
+    )
+    return page(body, title=f'Projects — {p.get("name", "")}',
+                desc=site.get("projects_lede", ""), person=p, active="/projects.html",
+                og_image=site.get("og_image"),
+                canonical=p.get("site_url", "").rstrip("/") + "/projects.html",
+                body_class="page-projects")
+
+
+def timeline_entry(e: dict) -> str:
+    logo = e.get("logo")
+    if logo:
+        mark = f'<img class="tl__logo" src="{E(logo)}" alt="">'
+    else:
+        initials = "".join(w[0] for w in e.get("org", "?").split()[:2]).upper()
+        mark = f'<span class="tl__logo tl__logo--mono" aria-hidden="true">{E(initials)}</span>'
+    note = f'<p class="tl__note">{rich(e["note"])}</p>' if e.get("note") else ""
+    return (
+        f'<li class="tl__item reveal" data-kind="{E(e.get("kind", "work"))}">'
+        f'{mark}<div class="tl__body">'
+        f'<p class="tl__period">{E(e.get("period", ""))}</p>'
+        f'<h3 class="tl__role">{E(e.get("role", ""))}</h3>'
+        f'<p class="tl__org">{E(e.get("org", ""))}</p>{note}</div></li>'
+    )
+
+
+def build_about(site: dict) -> str:
+    p = site["person"]
+    about = site.get("about", {})
+    photo = ""
+    if p.get("photo"):
+        photo = (f'<img class="portrait portrait--lg" src="{E(p["photo"])}" '
+                 f'alt="Portrait of {E(p.get("name", ""))}">')
+
+    bio = about.get("bio", [])
+    bio_html = paras("\n\n".join(bio) if isinstance(bio, list) else bio)
+
+    interests = ""
+    if about.get("interests"):
+        interests = ('<p class="about__interests"><span>Interested in</span> '
+                     + ", ".join(E(i) for i in about["interests"]) + ".</p>")
+
+    tl_html = ""
+    if site.get("timeline"):
+        tl_html = ('<section class="section">'
+                   '<h2 class="section__title">Experience &amp; education</h2>'
+                   f'<ol class="tl">{"".join(timeline_entry(e) for e in site["timeline"])}</ol>'
+                   "</section>")
+
+    body = ('<section class="section about">'
+            '<h1 class="page-title">About me</h1>'
+            f'<div class="about__grid{" about__grid--photo" if photo else ""}">{photo}'
+            f'<div class="about__text">{bio_html}{interests}</div></div>'
+            "</section>"
+            f"{tl_html}")
+    return page(body, title=f'About — {p.get("name", "")}',
+                desc=(bio[0] if bio else site.get("meta_description", "")),
+                person=p, active="/about.html", og_image=site.get("og_image"),
+                canonical=p.get("site_url", "").rstrip("/") + "/about.html",
+                body_class="page-about")
 
 
 def build_case(pr: dict, site: dict) -> str:
     p = site["person"]
-    out = [
-        '<a class="case__back" href="../index.html">Back to all work</a>',
-        '<header class="case__hero">',
-        f'<h1 class="case__title">{E(pr.get("title", ""))}</h1>',
-    ]
+    out = ['<a class="back" href="/projects.html">Back to all projects</a>',
+           '<header class="case__hero">',
+           f'<p class="case__period">{E(pr.get("period", ""))}</p>',
+           f'<h1 class="case__title">{E(pr.get("title", ""))}</h1>']
     if pr.get("hook"):
         out.append(f'<p class="case__hook">{rich(pr["hook"])}</p>')
-    meta = []
-    if pr.get("period"):
-        meta.append(f'<span class="case__period">{E(pr["period"])}</span>')
+    if pr.get("tags"):
+        out.append('<ul class="case__tags">'
+                   + "".join(f'<li class="tag">{E(t)}</li>' for t in pr["tags"]) + "</ul>")
     if pr.get("role"):
-        meta.append(f'<span class="case__role">{E(pr["role"])}</span>')
-    if meta:
-        out.append(f'<p class="case__meta">{"".join(meta)}</p>')
-    if pr.get("stack"):
-        out.append(f'<ul class="project__stack">{chips(pr["stack"])}</ul>')
+        out.append(f'<p class="case__role"><span>My part</span> {rich(pr["role"])}</p>')
     if pr.get("links"):
-        out.append(f'<div class="project__links">{links_list(pr["links"])}</div>')
-    out.append("</header><main>")
+        out.append('<div class="case__links">' + "".join(
+            f'<a class="btn{" btn--primary" if l.get("primary") else ""}" href="{E(l["url"])}"'
+            + (' rel="noopener"' if l["url"].startswith("http") else "")
+            + f'>{E(l["label"])}</a>' for l in pr["links"]) + "</div>")
+    out.append("</header>")
+
+    lead = pr.get("lead_media")
+    if not lead and pr.get("thumb"):
+        # the card figure doubles as the page's lead image rather than appearing
+        # only in the grid the reader has just left
+        lead = {"src": pr["thumb"], "alt": pr.get("thumb_alt", ""),
+                "caption": pr.get("thumb_caption", "")}
+    if lead:
+        out.append(f'<div class="case__lead">{media_block(lead)}</div>')
+
+    blocks = []
+    for lbl, key in (("Problem", "problem"), ("Approach", "approach"), ("Outcome", "outcome")):
+        if pr.get(key):
+            blocks.append(f'<div class="pao__row"><h2 class="pao__label">{lbl}</h2>'
+                          f'<div class="pao__body">{paras(pr[key])}</div></div>')
+    if blocks:
+        out.append(f'<section class="section pao">{"".join(blocks)}</section>')
 
     for sec in pr.get("sections", []):
         inner = [f'<h2 class="case__section-title">{E(sec.get("heading", ""))}</h2>',
@@ -447,27 +472,23 @@ def build_case(pr: dict, site: dict) -> str:
             inner.append(media_block(m))
         out.append(f'<section class="case__section reveal">{"".join(inner)}</section>')
 
-    out.append("</main>")
-    footer_links = [{"label": "More work", "url": "../index.html#work"}]
-    if p.get("email"):
-        footer_links.append({"label": "Get in touch", "url": f'mailto:{p["email"]}'})
-    out.append(f'<footer class="site-footer">{links_list(footer_links)}</footer>')
-
-    desc = pr.get("hook", "")
-    if len(desc) > 180:
-        desc = desc[:180].rsplit(" ", 1)[0] + "\u2026"
-    og = None
-    for m in [pr.get("lead_media")] + [mm for s in pr.get("sections", []) for mm in s.get("media", [])]:
-        if m and m.get("type") != "video":
-            og = m.get("src")
-            break
-    # Employer-tier projects carry no media by rule; fall back to the site card so
-    # their link previews are not blank.
+    og = pr.get("thumb")
+    if not og:
+        for m in [pr.get("lead_media")] + [mm for s in pr.get("sections", [])
+                                           for mm in s.get("media", [])]:
+            if m and m.get("type") != "video":
+                og = m.get("src")
+                break
     og = og or site.get("og_image")
-    h = head(f'{pr.get("title", "")} — {p.get("name", "")}', desc, p, "", og, "../site.css",
-             js_href="../site.js")
-    return (f'<!doctype html>\n<html lang="{E(site.get("lang", "en"))}">\n<head>\n  {h}\n</head>\n'
-            f'<body class="page-case">\n{"".join(out)}\n</body>\n</html>\n')
+    base = p.get("site_url", "").rstrip("/")
+    if og and og.startswith("/") and base:
+        og = base + og
+
+    return page("".join(out), title=f'{pr.get("title", "")} — {p.get("name", "")}',
+                desc=pr.get("blurb") or pr.get("hook", ""), person=p,
+                active="/projects.html", og_image=og,
+                canonical=base + f'/projects/{pr["slug"]}.html',
+                body_class="page-case")
 
 
 # ---------------------------------------------------------------- main
@@ -475,41 +496,48 @@ def build_case(pr: dict, site: dict) -> str:
 def validate(site: dict) -> list:
     errs = []
     p = site.get("person", {})
-    for field in ("name", "email", "linkedin"):
-        if not p.get(field):
-            errs.append(f"person.{field} is required — the site is useless without a contact path")
+    for f in ("name", "email", "linkedin"):
+        if not p.get(f):
+            errs.append(f"person.{f} is required — the site is useless without a contact path")
     slugs = set()
     for pr in site.get("projects", []):
-        if not pr.get("slug"):
+        s = pr.get("slug")
+        if not s:
             errs.append(f"project {pr.get('title', '?')!r} has no slug")
-        elif pr["slug"] in slugs:
-            errs.append(f"duplicate project slug: {pr['slug']}")
+        elif s in slugs:
+            errs.append(f"duplicate project slug: {s}")
         else:
-            slugs.add(pr["slug"])
-        if not pr.get("hook"):
-            errs.append(f"project {pr.get('slug', '?')} has no hook — that's the most-read line")
-    n = len(site.get("projects", []))
-    if n and not 3 <= n <= 6:
-        errs.append(f"{n} projects — the curated range is 4-6 (3 acceptable); see structure.md")
+            slugs.add(s)
+        if not pr.get("blurb"):
+            errs.append(f"project {s} has no blurb — that is the card's most-read line")
+    if not [pr for pr in site.get("projects", []) if pr.get("featured")]:
+        errs.append("no project is marked featured — the home page needs three")
     return errs
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--content", default="content/site.json")
-    ap.add_argument("--out", default="dist")
-    ap.add_argument("--css", default="assets/site.css")
-    ap.add_argument("--media", default="assets/media")
-    ap.add_argument("--strict", action="store_true", help="fail on validation warnings")
+    ap.add_argument("--out", default="docs")
+    ap.add_argument("--assets", default="assets")
+    ap.add_argument("--strict", action="store_true")
     args = ap.parse_args()
+
+    global ASSETS
+    ASSETS = Path(args.assets)
 
     site = json.loads(Path(args.content).read_text(encoding="utf-8"))
 
-    # Inline the hero figure so it paints with the first byte and inherits the
-    # page's colour tokens; an <img> could do neither.
-    hero_svg = Path(args.css).with_name("hero.svg")
-    if hero_svg.exists():
-        site["_hero_svg"] = hero_svg.read_text(encoding="utf-8").strip()
+    # A portrait that has not been supplied yet must not ship as a broken image.
+    # Drop the reference; the pages fall back to a text-only About automatically,
+    # and it comes back the moment the file exists.
+    photo = site.get("person", {}).get("photo", "")
+    if photo.startswith("/"):
+        local = Path(args.assets) / photo.split("/assets/", 1)[-1]
+        if not local.exists():
+            print(f"  . no portrait at {local} — rendering About without a photo",
+                  file=sys.stderr)
+            site["person"].pop("photo", None)
 
     errs = validate(site)
     for e in errs:
@@ -522,34 +550,31 @@ def main() -> int:
         shutil.rmtree(out)
     (out / "projects").mkdir(parents=True, exist_ok=True)
 
-    (out / "index.html").write_text(build_index(site, "site.css"), encoding="utf-8")
-    n_case = 0
+    (out / "index.html").write_text(build_home(site), encoding="utf-8")
+    (out / "projects.html").write_text(build_projects(site), encoding="utf-8")
+    (out / "about.html").write_text(build_about(site), encoding="utf-8")
+
+    n = 0
     for pr in site.get("projects", []):
-        if pr.get("deep_dive"):
-            (out / "projects" / f'{pr["slug"]}.html').write_text(build_case(pr, site), encoding="utf-8")
-            n_case += 1
+        (out / "projects" / f'{pr["slug"]}.html').write_text(build_case(pr, site), encoding="utf-8")
+        n += 1
 
-    css = Path(args.css)
-    if css.exists():
-        shutil.copy(css, out / "site.css")
-    js = css.with_name("site.js")
-    if js.exists():
-        shutil.copy(js, out / "site.js")
-    else:
-        print(f"  ! no stylesheet at {css} — write one per the design plan", file=sys.stderr)
-
-    media = Path(args.media)
-    if media.exists():
-        shutil.copytree(media, out / "assets" / "media")
-
-    for extra in ("resume.pdf", "favicon.ico", "favicon.svg", "CNAME"):
-        src = Path("assets") / extra
+    assets = Path(args.assets)
+    for name in ("site.css", "site.js"):
+        src = assets / name
         if src.exists():
-            shutil.copy(src, out / extra)
+            shutil.copy(src, out / name)
+        else:
+            print(f"  ! missing {src}", file=sys.stderr)
+
+    if (assets / "media").exists():
+        shutil.copytree(assets / "media", out / "assets" / "media")
+    for extra in ("resume.pdf", "favicon.ico", "CNAME"):
+        if (assets / extra).exists():
+            shutil.copy(assets / extra, out / extra)
 
     (out / ".nojekyll").write_text("", encoding="utf-8")
-
-    print(f"built {out}/index.html + {n_case} case study page(s)")
+    print(f"built {out}: home + projects + about + {n} project pages")
     return 0
 
 

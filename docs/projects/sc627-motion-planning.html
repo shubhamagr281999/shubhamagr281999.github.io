@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Classical motion planning, implemented and compared — Shubham Agrawal</title>
+  <meta name="description" content="Bug algorithms, potential fields and a velocity-obstacle formulation, each implemented on a common ROS harness and run against the same world so the comparison actually means something.">
+  <meta property="og:title" content="Classical motion planning, implemented and compared — Shubham Agrawal">
+  <meta property="og:description" content="Bug algorithms, potential fields and a velocity-obstacle formulation, each implemented on a common ROS harness and run against the same world so the comparison actually means something.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:url" content="https://shubhamagr281999.github.io/projects/sc627-motion-planning.html">
+  <link rel="canonical" href="https://shubhamagr281999.github.io/projects/sc627-motion-planning.html">
+  <meta property="og:image" content="https://shubhamagr281999.github.io/assets/media/fig-bug.jpg">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 32 32&#x27;%3E%3Crect width=&#x27;32&#x27; height=&#x27;32&#x27; fill=&#x27;%23FBFAF8&#x27;/%3E%3Cpath d=&#x27;M4 24h24M8 24V14M16 24V8M24 24v-6&#x27; stroke=&#x27;%239A4415&#x27; stroke-width=&#x27;3&#x27; fill=&#x27;none&#x27; stroke-linecap=&#x27;square&#x27;/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/site.css">
+  <script src="/site.js" defer></script>
+</head>
+<body class="page-case">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header"><a class="site-header__name" href="/">Shubham Agrawal</a><nav class="site-nav" aria-label="Sections"><a class="site-nav__link" href="/">Home</a><a class="site-nav__link is-active" href="/projects.html">Projects</a><a class="site-nav__link" href="/about.html">About</a><a class="site-nav__link" href="/resume.pdf">CV</a></nav></header>
+<main id="main"><a class="back" href="/projects.html">Back to all projects</a><header class="case__hero"><p class="case__period">Oct 2022</p><h1 class="case__title">Classical motion planning, implemented and compared</h1><p class="case__hook">The value here is not any single planner. It is that two of them run the identical world, so you can see exactly where the cheap method stops working.</p><ul class="case__tags"><li class="tag">Motion Planning</li></ul><p class="case__role"><span>My part</span> Solo, on a teaching assistant&#x27;s ROS harness. The simulation scaffolding is the course&#x27;s; the planners are mine.</p><div class="case__links"><a class="btn" href="https://github.com/shubhamagr281999/sc627_assignments" rel="noopener">Repository</a></div></header><div class="case__lead"><figure class="media"><img class="media__img" src="/assets/media/fig-bug.jpg" alt="Two routes past a circular obstacle: one following its boundary to the far side, one descending a potential and stalling short of the goal" width="1200" height="800" loading="lazy" decoding="async"></figure></div><section class="section pao"><div class="pao__row"><h2 class="pao__label">Problem</h2><div class="pao__body"><p>Implement the classical planners from first principles rather than calling a library, and understand their failure modes by running them.</p></div></div><div class="pao__row"><h2 class="pao__label">Approach</h2><div class="pao__body"><p>Boundary-following, potential fields, and a velocity-obstacle approach for moving obstacles, each on the same simulated robot and world.</p></div></div><div class="pao__row"><h2 class="pao__label">Outcome</h2><div class="pao__body"><p>The head-to-head is the interesting output: boundary following reaches the goal but along a wildly indirect route, while the potential field runs smooth and fast and then stops short, stuck in a local minimum it cannot escape. That is the textbook failure, reproduced on my own robot, which is a different kind of understanding from reading about it.</p></div></div></section></main>
+<footer class="site-footer"><div class="site-footer__links"><a href="mailto:shubhamagr281999@gmail.com">shubhamagr281999@gmail.com</a><a href="https://www.linkedin.com/in/1-shubham-agrawal/" rel="noopener">LinkedIn</a><a href="https://github.com/shubhamagr281999" rel="noopener">GitHub</a><a href="/resume.pdf">CV</a></div><p class="site-footer__note">Shubham Agrawal &middot; Mumbai, India</p></footer>
+</body>
+</html>

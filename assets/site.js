@@ -1,6 +1,5 @@
-/* Progressive enhancement only. Every word on this page is in the HTML and
-   readable with JavaScript disabled; this file adds motion and the link between
-   a project and the skills it uses. Nothing here gates content. */
+/* Progressive enhancement only. Every project is in the HTML and reachable with
+   JavaScript disabled; this file adds tag filtering and scroll reveals. */
 
 (function () {
   "use strict";
@@ -10,10 +9,9 @@
   /* ---------------------------------------------------- reveal on scroll */
 
   function initReveal() {
-    var items = document.querySelectorAll(".reveal");
+    var items = Array.prototype.slice.call(document.querySelectorAll(".reveal"));
     if (!items.length) return;
 
-    // No IntersectionObserver, or the reader asked for less motion: show everything.
     if (!("IntersectionObserver" in window) || reduced.matches) {
       items.forEach(function (el) { el.classList.add("is-in"); });
       return;
@@ -33,145 +31,67 @@
       io.observe(el);
     });
 
-    // Failsafe: if the observer never reports (an odd viewport, a headless
-    // renderer, a browser bug), show everything rather than leave the page blank.
+    // Failsafe: if the observer never reports, show everything rather than
+    // leave the page blank.
     window.setTimeout(function () {
       items.forEach(function (el) { el.classList.add("is-in"); });
     }, 1600);
   }
 
-  /* ------------------------------------------- scroll progress indicator */
+  /* ------------------------------------------------------- tag filtering */
 
-  function initProgress() {
-    var bar = document.querySelector(".scroll-progress i");
-    if (!bar) return;
-    var ticking = false;
+  function initFilters() {
+    var buttons = Array.prototype.slice.call(document.querySelectorAll(".filter"));
+    var grid = document.getElementById("project-grid");
+    if (!buttons.length || !grid) return;
 
-    function update() {
-      var h = document.documentElement;
-      var max = h.scrollHeight - h.clientHeight;
-      var pct = max > 0 ? (h.scrollTop || document.body.scrollTop) / max : 0;
-      bar.style.transform = "scaleX(" + Math.min(1, Math.max(0, pct)) + ")";
-      ticking = false;
-    }
+    var cards = Array.prototype.slice.call(grid.querySelectorAll(".card"));
+    var count = document.querySelector(".filter-count");
 
-    window.addEventListener("scroll", function () {
-      if (!ticking) { ticking = true; window.requestAnimationFrame(update); }
-    }, { passive: true });
-    update();
-  }
-
-  /* --------------------------------------------------- active section nav */
-
-  function initNav() {
-    var links = Array.prototype.slice.call(document.querySelectorAll(".site-nav__link"));
-    if (!links.length || !("IntersectionObserver" in window)) return;
-
-    var byId = {};
-    links.forEach(function (a) {
-      var id = a.getAttribute("href").replace("#", "");
-      var target = document.getElementById(id);
-      if (target) byId[id] = a;
-    });
-
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        var a = byId[entry.target.id];
-        if (!a) return;
-        if (entry.isIntersecting) {
-          links.forEach(function (l) { l.classList.remove("is-active"); });
-          a.classList.add("is-active");
-        }
+    function apply(tag, announce) {
+      var shown = 0;
+      cards.forEach(function (card) {
+        var tags = (card.getAttribute("data-tags") || "").split(/\s+/);
+        var on = tag === "all" || tags.indexOf(tag) !== -1;
+        card.hidden = !on;
+        if (on) shown++;
       });
-    }, { rootMargin: "-45% 0px -50% 0px" });
-
-    Object.keys(byId).forEach(function (id) {
-      io.observe(document.getElementById(id));
-    });
-  }
-
-  /* ------------------------------- tie the skills panel to the project in view */
-
-  function initSkillLink() {
-    var panel = document.querySelector(".layout__aside");
-    var projects = Array.prototype.slice.call(document.querySelectorAll(".project[data-skills]"));
-    if (!panel || !projects.length || !("IntersectionObserver" in window)) return;
-
-    var hint = panel.querySelector(".aside__hint");
-    var chipsByKey = {};
-    panel.querySelectorAll("[data-skill]").forEach(function (chip) {
-      chipsByKey[chip.getAttribute("data-skill")] = chip;
-    });
-
-    var current = null;
-
-    function clear() {
-      Object.keys(chipsByKey).forEach(function (k) {
-        chipsByKey[k].classList.remove("is-lit");
+      buttons.forEach(function (b) {
+        var isOn = b.getAttribute("data-filter") === tag;
+        b.classList.toggle("is-on", isOn);
+        b.setAttribute("aria-pressed", isOn ? "true" : "false");
       });
-      panel.classList.remove("is-linked");
-      if (hint) hint.textContent = hint.getAttribute("data-default") || "";
-    }
-
-    function light(project) {
-      if (project === current) return;
-      current = project;
-      if (!project) { clear(); return; }
-
-      Object.keys(chipsByKey).forEach(function (k) {
-        chipsByKey[k].classList.remove("is-lit");
-      });
-      var keys = (project.getAttribute("data-skills") || "").split(/\s+/);
-      var hits = 0;
-      keys.forEach(function (k) {
-        if (chipsByKey[k]) { chipsByKey[k].classList.add("is-lit"); hits++; }
-      });
-      panel.classList.toggle("is-linked", hits > 0);
-      if (hint && hits > 0) {
-        var title = project.querySelector(".project__title");
-        hint.textContent = "Used in " + (title ? title.textContent : "this project") + ".";
+      if (count) {
+        count.textContent = shown === cards.length
+          ? cards.length + " projects"
+          : shown + " of " + cards.length + " projects";
+      }
+      if (announce) {
+        try {
+          var url = tag === "all" ? location.pathname : location.pathname + "#" + tag;
+          history.replaceState(null, "", url);
+        } catch (e) { /* file:// or a locked-down browser — filtering still works */ }
       }
     }
 
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) light(entry.target);
-      });
-    }, { rootMargin: "-40% 0px -45% 0px" });
-
-    projects.forEach(function (p) { io.observe(p); });
-
-    // Leaving the work section entirely resets the panel to its resting state.
-    var work = document.getElementById("work");
-    if (work) {
-      new IntersectionObserver(function (entries) {
-        entries.forEach(function (e) { if (!e.isIntersecting) { current = null; clear(); } });
-      }, { threshold: 0 }).observe(work);
-    }
-  }
-
-  /* ------------------------------------------ details: swap the toggle label */
-
-  function initDetails() {
-    document.querySelectorAll(".project__detail").forEach(function (d) {
-      var label = d.querySelector(".project__toggle-label");
-      if (!label) return;
-      d.addEventListener("toggle", function () {
-        var key = d.open ? "data-open" : "data-closed";
-        var text = label.getAttribute(key);
-        if (text) label.textContent = text;
+    buttons.forEach(function (b) {
+      b.setAttribute("aria-pressed", b.classList.contains("is-on") ? "true" : "false");
+      b.addEventListener("click", function () {
+        apply(b.getAttribute("data-filter"), true);
       });
     });
+
+    // deep link: /projects.html#perception opens pre-filtered
+    var initial = (location.hash || "").replace("#", "");
+    var known = buttons.some(function (b) { return b.getAttribute("data-filter") === initial; });
+    apply(known ? initial : "all", false);
   }
 
   /* ------------------------------------------------------------------ init */
 
   function init() {
     initReveal();
-    initProgress();
-    initNav();
-    initSkillLink();
-    initDetails();
+    initFilters();
   }
 
   if (document.readyState === "loading") {

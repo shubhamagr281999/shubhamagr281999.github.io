@@ -1,15 +1,7 @@
 {
   "lang": "en",
-  "meta_description": "Shubham Agrawal is a robotics engineer working on vision-language-action manipulation: simulation, dataset curation, policy evaluation, and the embedded autonomy underneath.",
+  "meta_description": "Shubham Agrawal is a robotics engineer working on vision-language-action manipulation: simulation, data pipelines and policy evaluation, on top of three years of production autonomy.",
   "og_image": "https://shubhamagr281999.github.io/assets/media/og-card.jpg",
-  "footer": "Built as static HTML. Content lives in one JSON file; the source is on GitHub.",
-  "section_titles": {
-    "projects": "Selected work",
-    "experience": "Experience",
-    "skills": "Skills",
-    "education": "Education",
-    "contact": "Get in touch"
-  },
   "person": {
     "name": "Shubham Agrawal",
     "job_title": "Robotics Engineer",
@@ -20,30 +12,47 @@
     "github": "https://github.com/shubhamagr281999",
     "resume": "/resume.pdf",
     "site_url": "https://shubhamagr281999.github.io/",
-    "favicon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23FBFAF8'/%3E%3Cpath d='M4 24h24M8 24V14M16 24V8M24 24v-6' stroke='%239A4415' stroke-width='3' fill='none' stroke-linecap='square'/%3E%3C/svg%3E"
+    "favicon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23FBFAF8'/%3E%3Cpath d='M4 24h24M8 24V14M16 24V8M24 24v-6' stroke='%239A4415' stroke-width='3' fill='none' stroke-linecap='square'/%3E%3C/svg%3E",
+    "photo": "/assets/media/portrait.jpg"
   },
-  "intro": [
-    "I build the infrastructure that makes robot learning work: simulation, dataset curation, and the evaluation harness that tells you whether a policy actually got better. Before that I spent three years on a production autonomy stack for an indoor mobile robot, across every layer of it, from the GPIO driver that moves the wheels to the TSDF mapper that decides where they go.",
-    "I am looking for robot learning and embodied-AI roles where the model and the robot are the same problem."
-  ],
-  "hero_stats": [
+  "hero": {
+    "headline": "Robotics engineer at Miko. I build the simulation, data and evaluation infrastructure that makes robot learning work.",
+    "sub": "Before that, three years across every layer of a production autonomy stack, from the GPIO driver that moves the wheels to the mapper that decides where they go.",
+    "buttons": [
+      {
+        "label": "See the work",
+        "url": "/projects.html",
+        "primary": true
+      },
+      {
+        "label": "Read the CV",
+        "url": "/resume.pdf"
+      },
+      {
+        "label": "Email me",
+        "url": "mailto:shubhamagr281999@gmail.com"
+      }
+    ]
+  },
+  "videos": [
     {
-      "value": "3+ yrs",
-      "label": "production robotics"
+      "title": "Soft continuum robot tracking a path",
+      "hint": "drop an .mp4 in assets/media and set src"
     },
     {
-      "value": "7",
-      "label": "projects here"
+      "title": "Policy rollout in MuJoCo",
+      "hint": "simulation capture"
     },
     {
-      "value": "2",
-      "label": "VLA architectures traced to operation level"
+      "title": "Warehouse fleet on the arena",
+      "hint": "Flipkart GRiD hardware run"
     },
     {
-      "value": "IIT-B",
-      "label": "B.Tech + M.Tech, Mechanical"
+      "title": "Drone descent",
+      "hint": "DRDO challenge run"
     }
   ],
+  "projects_lede": "Everything I have built that is worth showing, newest and strongest first. Three of these are work at Miko and carry no imagery or internal detail by agreement with my employer.",
   "projects": [
     {
       "slug": "vla-manipulation-infra",
@@ -64,7 +73,6 @@
         "LeRobot",
         "Qt 6"
       ],
-      "deep_dive": true,
       "sections": [
         {
           "heading": "The gap this fills",
@@ -90,7 +98,15 @@
           "heading": "The error that pointed at the wrong place",
           "body": "Evaluation runs started dying with a CUDA error reporting no kernel image available, about four hundred lines into a script. Not at model load, which is where anyone would look first.\n\nThe cause was that the project pins a torch version whose compiled architecture list stops well short of the evaluation box's GPU generation. It surfaces late because moving a model to a device is a pure memory copy. Nothing executes a kernel until the first real operation, so the failure appears at the first compute call rather than at the incompatibility that caused it, and nothing in the repository checks GPU capability at start-up.\n\nI wrote a standalone diagnostic that prints the compiled architecture list against each GPU, tries three trivial kernels, and surveys every environment's build, so the next person spends a minute on it instead of a day."
         }
-      ]
+      ],
+      "featured": true,
+      "tags": [
+        "Physical AI",
+        "Simulation"
+      ],
+      "thumb": "/assets/media/fig-vla-loop.jpg",
+      "thumb_alt": "Diagram of a four-stage loop: teleoperation to curation to fine-tuning to evaluation and back",
+      "blurb": "Built the loop that turns raw teleoperation into a trained manipulation policy: curate, fine-tune, then evaluate in simulation or on real hardware through one code path."
     },
     {
       "slug": "autonomous-ground-robot",
@@ -111,7 +127,6 @@
         "Gazebo",
         "GitLab CI"
       ],
-      "deep_dive": true,
       "sections": [
         {
           "heading": "The span",
@@ -133,7 +148,16 @@
           "heading": "Measuring instead of asserting",
           "body": "Performance regressions are invisible unless something is watching for them. I wrote an in-house profiler that times instrumented functions into a CSV, then wired it into CI as a comparison rather than a report: the pipeline downloads the baseline profiler data from the package registry and plots the current change against it as a build artifact.\n\nThat is a materially harder thing to build than a test suite, and it is the reason specific optimisations here, the separable distance transform, single-pass raycasting, reduced hash lookups, avoided allocations in the frontier scoring loop, can be stated as results rather than intentions."
         }
-      ]
+      ],
+      "featured": true,
+      "tags": [
+        "Motion Planning",
+        "Perception",
+        "Embedded"
+      ],
+      "thumb": "/assets/media/fig-distance-field.jpg",
+      "thumb_alt": "Occupancy grid shaded by distance to the nearest obstacle, with a planned route that keeps clearance",
+      "blurb": "Three years across every layer of one robot: the GPIO driver that moves the wheels, the shared-memory bus, and the TSDF mapper and planners that decide where to go."
     },
     {
       "slug": "edge-ai-person-following",
@@ -153,7 +177,6 @@
         "ONNX",
         "CMake"
       ],
-      "deep_dive": true,
       "sections": [
         {
           "heading": "Getting a network onto the DSP",
@@ -171,7 +194,16 @@
           "heading": "Why this is the answer to one specific interview question",
           "body": "\"Can you get a learned model running on a robot?\" is the question an embodied-AI team actually needs answered, and it is usually answered with a plan.\n\nHere the conversion and deployment path onto the DSP and the runtime that consumes it were built by the same person, and the result shipped. That is the whole point of including this project: it makes the rest of my model work concrete rather than aspirational."
         }
-      ]
+      ],
+      "featured": true,
+      "tags": [
+        "Perception",
+        "Physical AI",
+        "Embedded"
+      ],
+      "thumb": "/assets/media/fig-kalman.jpg",
+      "thumb_alt": "A constant-velocity filter tracking a target through a stretch where detections stop",
+      "blurb": "A person-following capability with the detector running on the robot's on-board NPU. Holding onto the right person across frames is the half that decides whether it works."
     },
     {
       "slug": "soft-continuum-robot",
@@ -205,7 +237,6 @@
         "width": 860,
         "height": 1268
       },
-      "deep_dive": true,
       "sections": [
         {
           "heading": "A model that is both fast and honest",
@@ -245,7 +276,15 @@
             }
           ]
         }
-      ]
+      ],
+      "featured": false,
+      "tags": [
+        "Control",
+        "Simulation"
+      ],
+      "thumb": "/assets/media/soft-robot-hardware.jpg",
+      "thumb_alt": "Five-segment tendon-driven soft continuum robot with red tracking markers on each segment plate",
+      "blurb": "A five-segment silicone robot I fabricated, closed-loop controlled from an overhead camera. The controller needed torque the servos could not deliver, so the fix was to change what it commands."
     },
     {
       "slug": "robotic-charging-challenge",
@@ -278,7 +317,6 @@
         "width": 1200,
         "height": 756
       },
-      "deep_dive": true,
       "sections": [
         {
           "heading": "Reachability, not reach",
@@ -301,7 +339,15 @@
             }
           ]
         }
-      ]
+      ],
+      "featured": false,
+      "tags": [
+        "Motion Planning",
+        "Simulation"
+      ],
+      "thumb": "/assets/media/workspace-orientation-field.jpg",
+      "thumb_alt": "Stacked slices of an arm's task space, each cell coloured by how many orientations it can be reached in",
+      "blurb": "Inter-IIT Silver Medal. I scored every cell of a 6-DoF arm's task space by how many orientations it could reach it in, then used that field to choose link lengths."
     },
     {
       "slug": "multi-robot-fleet",
@@ -334,7 +380,15 @@
         "caption": "The three-wheel omni-drive revision. The holonomic redesign partly obsoleted my own heading-aware planner change, which is a tension worth being asked about.",
         "width": 497,
         "height": 507
-      }
+      },
+      "featured": false,
+      "tags": [
+        "Motion Planning",
+        "Perception"
+      ],
+      "thumb": "/assets/media/grid-bot-cad.jpg",
+      "thumb_alt": "CAD render of a small three-wheel omni-drive warehouse robot with a flipping tray",
+      "blurb": "Flipkart's brief said the robots could not know where they were: one ceiling camera had to localise the whole fleet. That constraint forced everything."
     },
     {
       "slug": "quadruped-mpc",
@@ -357,31 +411,173 @@
           "label": "Repository",
           "url": "https://github.com/shubhamagr281999/Quadruped_MPC_Control_Optimisation_CL603"
         }
+      ],
+      "featured": false,
+      "tags": [
+        "Control",
+        "Simulation"
+      ],
+      "thumb": "/assets/media/fig-quadruped.jpg",
+      "thumb_alt": "A four-leg contact schedule over three gait cycles, beside a friction cone constraining the foot force",
+      "blurb": "Convex MPC for a quadruped with a hand-written active-set QP. The interesting part was noticing most of the constraints were redundant and proving which."
+    },
+    {
+      "slug": "coverage-path-planning",
+      "title": "Exact cell decomposition for coverage",
+      "period": "2022",
+      "tags": [
+        "Motion Planning"
+      ],
+      "thumb": "/assets/media/fig-coverage.jpg",
+      "thumb_alt": "Eleven circular obstacles with vertical sweep lines, the free cells shaded, and an adjacency graph linking their centres",
+      "blurb": "Skipped sampling planners entirely and implemented exact Morse cell decomposition in C++ over circular obstacles, so every gap gets planned through regardless of width.",
+      "role": "Solo.",
+      "hook": "Sampling planners burn memory on samples and start missing narrow gaps as obstacle density rises. Exact decomposition does not: it plans through every gap regardless of width, which is the guarantee I wanted.",
+      "problem": "Plan a route through a workspace of known circular obstacles. A probabilistic roadmap would have been the obvious answer, but its performance depends on sampling density and it can miss a narrow passage entirely. I had already built an RRT for a 2-DoF arm, so I knew what I would be giving up.",
+      "approach": "A sweep line over the critical x-coordinates of every circle, splitting the free space into trapezoidal cells bounded by obstacle arcs, and an adjacency graph built as cells open and close. Travelling between two points becomes: find the cell containing each, then walk the graph through the midpoints of shared edges.",
+      "outcome": "It plans through every gap in the workspace. Two honest caveats: the graph search over the cell adjacency is a breadth-first cost relaxation rather than the A* the README claims, so the route is not guaranteed shortest; and despite the repository name I did not implement the complete-coverage traversal, which my own notes admit.",
+      "links": []
+    },
+    {
+      "slug": "drdo-drone-challenge",
+      "title": "Autonomous drone landing, DRDO challenge",
+      "period": "2021",
+      "tags": [
+        "Perception",
+        "Motion Planning"
+      ],
+      "thumb": "/assets/media/fig-drone.jpg",
+      "thumb_alt": "Schematic of a quadrotor descending along a curved approach onto a marked landing pad",
+      "blurb": "A team entry for the DRDO drone challenge: find a marked landing site from the air and put the aircraft on it, under competition time pressure.",
+      "role": "Team project. My own contributions were largely rewritten during the sprint, so the pipeline at the final commit is mostly a teammate's work. I am listing it for the experience rather than claiming the code.",
+      "hook": "Detect a landing marker from the air, plan a descent onto it, and touch down. A competition sprint, which is its own kind of engineering constraint.",
+      "problem": "The challenge asked for an autonomous quadrotor that could locate a marked landing site and land on it without a human in the loop.",
+      "approach": "A vision front end to find the marker, an estimator to hold the pose, and a guidance law bringing the aircraft down along an approach profile, all inside a simulated environment.",
+      "outcome": "The team produced a working entry. The strongest ideas in the final repository, including the penalty cascade and the trick for handling invalid regions, are a teammate's and I am not going to present them as mine.",
+      "links": [
+        {
+          "label": "Repository",
+          "url": "https://github.com/shubhamagr281999/drdo-drone-challenge"
+        }
       ]
+    },
+    {
+      "slug": "manipulator-path-planning",
+      "title": "Sampling-based planning for a 2-DoF arm",
+      "period": "Aug 2021",
+      "tags": [
+        "Motion Planning",
+        "Simulation"
+      ],
+      "thumb": "/assets/media/fig-manipulator.jpg",
+      "thumb_alt": "A planar two-link arm with its reachable annulus, beside a randomly grown search tree in configuration space",
+      "blurb": "A planar two-link arm planning around obstacles in configuration space, simulated in Gazebo. Solo, early, and the project that taught me what sampling buys and what it costs.",
+      "role": "Solo.",
+      "hook": "Planning for an arm means planning in joint space, where obstacles in the world become shapes you have never seen before. This is the project where that stopped being a sentence in a lecture.",
+      "problem": "Move a planar two-link arm from one configuration to another without hitting obstacles, which requires searching joint space rather than the workspace the obstacles live in.",
+      "approach": "Map the obstacles into configuration space, grow a randomised tree from the start configuration toward sampled targets, and extract a path once the tree reaches the goal region. Simulated with the arm model in Gazebo.",
+      "outcome": "It plans and the arm executes. It is a 2-DoF toy by design, there are no timing or success-rate measurements in the repository, and I stopped working on it in 2021. What it gave me was the direct comparison that later made me choose exact decomposition for the coverage project.",
+      "links": [
+        {
+          "label": "Repository",
+          "url": "https://github.com/shubhamagr281999/manipulator_path_planning"
+        }
+      ]
+    },
+    {
+      "slug": "sc627-motion-planning",
+      "title": "Classical motion planning, implemented and compared",
+      "period": "Oct 2022",
+      "tags": [
+        "Motion Planning"
+      ],
+      "thumb": "/assets/media/fig-bug.jpg",
+      "thumb_alt": "Two routes past a circular obstacle: one following its boundary to the far side, one descending a potential and stalling short of the goal",
+      "blurb": "Bug algorithms, potential fields and a velocity-obstacle formulation, each implemented on a common ROS harness and run against the same world so the comparison actually means something.",
+      "role": "Solo, on a teaching assistant's ROS harness. The simulation scaffolding is the course's; the planners are mine.",
+      "hook": "The value here is not any single planner. It is that two of them run the identical world, so you can see exactly where the cheap method stops working.",
+      "problem": "Implement the classical planners from first principles rather than calling a library, and understand their failure modes by running them.",
+      "approach": "Boundary-following, potential fields, and a velocity-obstacle approach for moving obstacles, each on the same simulated robot and world.",
+      "outcome": "The head-to-head is the interesting output: boundary following reaches the goal but along a wildly indirect route, while the potential field runs smooth and fast and then stops short, stuck in a local minimum it cannot escape. That is the textbook failure, reproduced on my own robot, which is a different kind of understanding from reading about it.",
+      "links": [
+        {
+          "label": "Repository",
+          "url": "https://github.com/shubhamagr281999/sc627_assignments"
+        }
+      ]
+    },
+    {
+      "slug": "bayes-filter",
+      "title": "Recursive Bayesian localisation, from scratch",
+      "period": "May 2024",
+      "tags": [
+        "Perception"
+      ],
+      "thumb": "/assets/media/fig-bayes.jpg",
+      "thumb_alt": "A corridor with three doors, and the belief distribution over position sharpening after each sense and move update",
+      "blurb": "The discrete Bayes filter built from nothing, to watch a belief distribution sharpen and blur as a robot senses and moves. Small on purpose.",
+      "role": "Solo.",
+      "hook": "Every state estimator I have written since is this loop with more machinery bolted on. Building the smallest version by hand is what made the rest legible.",
+      "problem": "A robot in a corridor knows what a door looks like but not where it is. Its belief about its own position has to survive ambiguous observations and grow less certain every time it moves.",
+      "approach": "A discrete belief over positions, multiplied by an observation likelihood at each sense step and convolved with a motion kernel at each move step, normalised and plotted so the distribution is visible at every iteration.",
+      "outcome": "It does what the textbook says: sensing sharpens the belief into peaks at each door, moving smears it out again, and repeated observations collapse it onto the true position. There is no benchmark here and it is not trying to be one.",
+      "links": [
+        {
+          "label": "Repository",
+          "url": "https://github.com/shubhamagr281999/Understanding-Bayes-Filter"
+        }
+      ]
+    },
+    {
+      "slug": "micromouse",
+      "title": "Micromouse: flood fill in a maze",
+      "period": "Dec 2021",
+      "tags": [
+        "Embedded",
+        "Motion Planning"
+      ],
+      "thumb": "/assets/media/fig-micromouse.jpg",
+      "thumb_alt": "A maze with cells shaded by their distance to the centre, and the shortest route those distances induce",
+      "blurb": "A maze-solving robot for the Techfest International Micromouse Challenge: explore an unknown maze, build the wall map, and flood fill to the fastest route home.",
+      "role": "Team entry, built on a competition-supplied simulation template.",
+      "hook": "A micromouse has to solve the maze and then drive it fast, and those two goals want different things from the same robot.",
+      "problem": "Explore an unknown maze from a corner, discover walls as sensors reach them, and then return to the centre along the shortest route the map allows.",
+      "approach": "Flood fill: assign every cell its distance to the goal given the walls known so far, re-run the fill whenever a new wall is discovered, and drive downhill. It is the standard micromouse answer because it gives a correct route from partial knowledge.",
+      "outcome": "An entry for the 2021 challenge. The repository is honestly a competition snapshot rather than a finished artefact, which is why there is no code link here.",
+      "links": []
     }
   ],
-  "experience": [
+  "about": {
+    "teaser": "I am a robotics engineer at Miko, working on vision-language-action manipulation. I like the part of robotics where the model meets the machine and something breaks.",
+    "bio": [
+      "I am a robotics engineer at Miko in Mumbai. Right now I build the infrastructure that makes robot learning work: the curation tool that turns raw teleoperation into a training set worth using, the harness that runs a policy in simulation or on real hardware through the same code path, and the model analysis that tells the team which engineering constraints are real.",
+      "Before that I spent three years on a production autonomy stack for an indoor mobile robot, and I worked across all of it. I wrote the sysfs GPIO driver and the PID drive system at the bottom, the shared-memory middleware in the middle, and the TSDF mapper, the D* Lite planner and the local planner on top. I also built the person-following capability, with the detector running on the robot's on-board NPU, which is the project I point at when someone asks whether I have actually deployed a learned model on hardware.",
+      "I studied mechanical engineering at IIT Bombay on the five-year dual degree. My Master's thesis was on modelling and controlling a soft continuum robot, which meant casting silicone segments, building the robot, and then discovering that the actuator could not deliver the quantity my controller was written in. Changing the control interface rather than fighting the hardware is still the piece of engineering I am most pleased with.",
+      "The through-line is that I like being responsible for the whole path from the algorithm down to the thing that moves. I am looking for robot learning and embodied-AI work where the model and the robot are the same problem."
+    ],
+    "interests": [
+      "robot learning and VLA models",
+      "simulation and sim-to-real",
+      "motion planning",
+      "state estimation",
+      "embedded systems",
+      "the tooling that makes all of it repeatable"
+    ]
+  },
+  "timeline": [
     {
+      "kind": "work",
       "org": "Miko",
-      "title": "Robotics Engineer",
-      "period": "Jul 2023 – present · Mumbai, India",
-      "summary": "I work across two areas: the simulation, data and evaluation infrastructure for vision-language-action manipulation, and before that the autonomy stack for an indoor mobile robot, where I was a major contributor across every layer and the primary author of its core modules.",
-      "highlights": [
-        "Created the manipulator framework that runs a policy in MuJoCo or on real arms through one interface, and sole-authored the dataset curation tool that feeds it.",
-        "Traced π₀.₅ and OpenVLA-OFT to operation level and verified them against live instrumented runs, then used what that showed to decide what the tooling needed to catch.",
-        "Owned the autonomy stack's core algorithm modules, its shared-memory middleware, and the embedded layer beneath them, from board bring-up through drivers and control.",
-        "Authored the CI pipeline, including a performance-regression stage that compares each change against the baseline rather than just reporting timings."
-      ],
-      "stack": [
-        "C++17",
-        "Python",
-        "MuJoCo",
-        "JAX",
-        "PyTorch",
-        "Embedded Linux",
-        "Yocto",
-        "GitLab CI"
-      ]
+      "role": "Robotics Engineer",
+      "period": "Jul 2023 — Present",
+      "note": "Vision-language-action manipulation infrastructure, and before that the autonomy stack for an indoor mobile robot: mapping, planning, control, middleware and board bring-up."
+    },
+    {
+      "kind": "education",
+      "org": "Indian Institute of Technology Bombay",
+      "role": "B.Tech + M.Tech (Dual Degree), Mechanical Engineering",
+      "period": "2018 — Aug 2023",
+      "note": "CPI 9.16 / 10. Master's thesis on modelling and control of a planar soft robot, awarded a departmental Research Award."
     }
   ],
   "skills": [
@@ -436,14 +632,6 @@
         "Embedded Linux and Yocto",
         "CI/CD, profiling and test infrastructure"
       ]
-    }
-  ],
-  "education": [
-    {
-      "institution": "Indian Institute of Technology Bombay",
-      "degree": "B.Tech + M.Tech (Dual Degree), Mechanical Engineering",
-      "period": "Graduated August 2023",
-      "note": "CPI 9.16 / 10. Master's thesis on modelling and control of a planar soft robot, awarded a departmental Research Award."
     }
   ]
 }
