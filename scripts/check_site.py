@@ -117,8 +117,14 @@ def check_page(path: Path, root: Path, errors: list, warns: list):
     for href in p.links:
         if href.startswith(("http://", "https://", "mailto:", "tel:", "#")):
             continue
-        target = (path.parent / href.split("#")[0]).resolve()
-        if href.split("#")[0] and not target.exists():
+        bare = href.split("#")[0]
+        # Root-relative hrefs resolve against the published root, not the page's
+        # directory — this is a user Pages site, so "/" is the docs/ root.
+        if bare.startswith("/"):
+            target = (root / bare.lstrip("/")).resolve()
+        else:
+            target = (path.parent / bare).resolve()
+        if bare and not target.exists():
             errors.append(f"{where}: broken internal link -> {href}")
 
     body = text_of(raw)

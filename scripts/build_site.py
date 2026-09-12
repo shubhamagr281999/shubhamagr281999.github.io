@@ -352,6 +352,9 @@ def build_case(pr: dict, site: dict) -> str:
         if m and m.get("type") != "video":
             og = m.get("src")
             break
+    # Employer-tier projects carry no media by rule; fall back to the site card so
+    # their link previews are not blank.
+    og = og or site.get("og_image")
     h = head(f'{pr.get("title", "")} — {p.get("name", "")}', desc, p, "", og, "../site.css")
     return (f'<!doctype html>\n<html lang="{E(site.get("lang", "en"))}">\n<head>\n  {h}\n</head>\n'
             f'<body class="page-case">\n{"".join(out)}\n</body>\n</html>\n')
