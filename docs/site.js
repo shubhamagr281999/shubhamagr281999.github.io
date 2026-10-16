@@ -109,9 +109,28 @@
     if (reduced.addEventListener) reduced.addEventListener("change", apply);
   }
 
+  /* ------------------------------------------- header over the hero art */
+
+  // On the home page the header floats transparent over the art; give it a
+  // ground once the reader has scrolled, so the nav stays legible over content.
+  function initHeader() {
+    var body = document.body;
+    if (!body.classList.contains("page-home")) return;
+    var ticking = false;
+    function update() {
+      ticking = false;
+      body.classList.toggle("is-scrolled", window.scrollY > 24);
+    }
+    window.addEventListener("scroll", function () {
+      if (!ticking) { ticking = true; window.requestAnimationFrame(update); }
+    }, { passive: true });
+    update();
+  }
+
   /* ------------------------------------------------------------------ init */
 
   function init() {
+    initHeader();
     initReveal();
     initFilters();
     initVideos();

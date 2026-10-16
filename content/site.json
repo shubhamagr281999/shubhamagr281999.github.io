@@ -1,11 +1,11 @@
 {
   "lang": "en",
-  "meta_description": "Shubham Agrawal is a robotics engineer working on vision-language-action manipulation: simulation, data pipelines and policy evaluation, on top of three years of production autonomy.",
+  "meta_description": "Shubham Agrawal is a robotics engineer building robot-learning models (vision-language-action and world-action models) and the data and training infrastructure behind them, on top of three years of production autonomy.",
   "og_image": "https://shubhamagr281999.github.io/assets/media/og-card.jpg",
   "person": {
     "name": "Shubham Agrawal",
     "job_title": "Robotics Engineer",
-    "tagline": "Robotics engineer working on vision-language-action manipulation: simulation, data pipelines and policy evaluation, on top of three years of production autonomy.",
+    "tagline": "Robotics engineer building robot-learning models (vision-language-action and world-action models) and the data and training infrastructure behind them, on top of three years of production autonomy.",
     "location": "Mumbai, India",
     "email": "shubhamagr281999@gmail.com",
     "linkedin": "https://www.linkedin.com/in/1-shubham-agrawal/",
@@ -16,8 +16,8 @@
     "photo": "/assets/media/portrait.jpg"
   },
   "hero": {
-    "headline": "Robotics engineer at Miko. I build the simulation, data and evaluation infrastructure that makes robot learning work.",
-    "sub": "Before that, three years across every layer of a production autonomy stack, from the GPIO driver that moves the wheels to the mapper that decides where they go.",
+    "headline": "Robotics engineer at Miko, building robot-learning models from the ground up, and the data and training infrastructure behind them.",
+    "sub": "Alongside that, I fine-tune and evaluate policies in simulation and on hardware. Before that, three years across every layer of a production autonomy stack, from the GPIO driver that moves the wheels to the mapper that sees the room and the planner that decides where to go.",
     "buttons": [
       {
         "label": "See the work",
@@ -25,12 +25,12 @@
         "primary": true
       },
       {
-        "label": "Read the CV",
-        "url": "/resume.pdf"
+        "label": "About me",
+        "url": "/about.html"
       },
       {
-        "label": "Email me",
-        "url": "mailto:shubhamagr281999@gmail.com"
+        "label": "Read the CV",
+        "url": "/resume.pdf"
       }
     ]
   },
@@ -39,18 +39,6 @@
       "title": "Soft continuum robot tracing an S, 5× speed",
       "src": "/assets/media/soft-robot-tracking-s.mp4",
       "poster": "/assets/media/soft-robot-tracking-s.jpg"
-    },
-    {
-      "title": "Policy rollout in MuJoCo",
-      "hint": "simulation capture"
-    },
-    {
-      "title": "Warehouse fleet on the arena",
-      "hint": "Flipkart GRiD hardware run"
-    },
-    {
-      "title": "Drone descent",
-      "hint": "DRDO challenge run"
     }
   ],
   "projects_lede": "Everything I have built that is worth showing, newest and strongest first. Three of these are work at Miko and carry no imagery or internal detail by agreement with my employer.",
@@ -252,7 +240,7 @@
               "height": 1268
             }
           ],
-          "body":"The planar body is a square mesh. Every vertex is a node carrying a share of the mass, every edge and diagonal is a spring, and springs act in parallel where squares share an edge. The dynamics are the usual mass, damping and stiffness form with Rayleigh damping.\n\nThe load-bearing detail is that the stiffness matrix is rebuilt from the deformed configuration at every step. That is what lets a lumped mass-spring network capture geometric nonlinearity at large deflection, and it is the whole reason this competes with finite elements for accuracy while staying cheap enough to run repeatedly.\n\nI did not invent the mass-spring topology. It comes from my supervisor's earlier work; my contribution was validating it in the large-deformation range and building the first control stack on it. I benchmarked it four independent ways: against linear analytical solutions in tension and compression, against a chained beam-constraint model under end force and pure moment, against FEM for distributed bending across three aspect ratios, and against FEM for the first three natural frequencies.\n\nOne benchmark disagrees. The step-response settling value in one axis does not match FEM, by about a millimetre. I reported it rather than dropping the plot."
+          "body": "The planar body is a square mesh. Every vertex is a node carrying a share of the mass, every edge and diagonal is a spring, and springs act in parallel where squares share an edge. The dynamics are the usual mass, damping and stiffness form with Rayleigh damping.\n\nThe load-bearing detail is that the stiffness matrix is rebuilt from the deformed configuration at every step. That is what lets a lumped mass-spring network capture geometric nonlinearity at large deflection, and it is the whole reason this competes with finite elements for accuracy while staying cheap enough to run repeatedly.\n\nI did not invent the mass-spring topology. It comes from my supervisor's earlier work; my contribution was validating it in the large-deformation range and building the first control stack on it. I benchmarked it four independent ways: against linear analytical solutions in tension and compression, against a chained beam-constraint model under end force and pure moment, against FEM for distributed bending across three aspect ratios, and against FEM for the first three natural frequencies.\n\nOne benchmark disagrees. The step-response settling value in one axis does not match FEM, by about a millimetre. I reported it rather than dropping the plot."
         },
         {
           "heading": "A Jacobian from seven simulators",
@@ -560,9 +548,9 @@
     }
   ],
   "about": {
-    "teaser": "I am a robotics engineer at Miko, working on vision-language-action manipulation. I like the part of robotics where the model meets the machine and something breaks.",
+    "teaser": "I am a robotics engineer at Miko, where I design robot-learning models and build the data and training pipeline behind them. Before that I spent three years on a production autonomy stack for an indoor mobile robot, from the wheel drivers up to the mapper and planners. I like the part of robotics where the model meets the machine and something breaks.",
     "bio": [
-      "I am a robotics engineer at Miko in Mumbai. Right now I build the infrastructure that makes robot learning work: the curation tool that turns raw teleoperation into a training set worth using, the harness that runs a policy in simulation or on real hardware through the same code path, and the model analysis that tells the team which engineering constraints are real.",
+      "I am a robotics engineer at Miko in Mumbai. Right now I design robot-learning models from scratch, vision-language-action and world-action models, and build the data pipeline that trains them on thousands of hours of robot data. Alongside that I fine-tune and evaluate policies, which is where the earlier tooling came from: the curation tool that turns raw teleoperation into a training set worth using, the harness that runs a policy in simulation or on real hardware through the same code path, and the model analysis that tells the team which engineering constraints are real.",
       "Before that I spent three years on a production autonomy stack for an indoor mobile robot, and I worked across all of it. I wrote the sysfs GPIO driver and the PID drive system at the bottom, the shared-memory middleware in the middle, and the TSDF mapper, the D* Lite planner and the local planner on top. I also built the person-following capability, with the detector running on the robot's on-board NPU, which is the project I point at when someone asks whether I have actually deployed a learned model on hardware.",
       "I studied mechanical engineering at IIT Bombay on the five-year dual degree. My Master's thesis was on modelling and controlling a soft continuum robot, which meant casting silicone segments, building the robot, and then discovering that the actuator could not deliver the quantity my controller was written in. Changing the control interface rather than fighting the hardware is still the piece of engineering I am most pleased with.",
       "The through-line is that I like being responsible for the whole path from the algorithm down to the thing that moves. I am looking for robot learning and embodied-AI work where the model and the robot are the same problem."

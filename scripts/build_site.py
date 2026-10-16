@@ -7,7 +7,7 @@ years without a dependency archaeology session.
     python3 scripts/build_site.py --out docs
 
 Emits:
-    docs/index.html              home: hero, videos, featured work, about teaser
+    docs/index.html              home: hero, featured work, video strip (3+ clips), about, contact
     docs/projects.html           every project, filterable by tag
     docs/about.html              bio + experience & education timeline
     docs/projects/<slug>.html    a detail page per project
@@ -80,6 +80,10 @@ def image_size(src: str, assets: Path) -> tuple:
 
 
 ASSETS = Path("assets")
+CONTENT_DIR = Path("content")
+NOOPENER = ' rel="noopener"'
+# Fewest real clips worth giving the home page a video strip for.
+MIN_CLIPS = 3
 
 
 # ---------------------------------------------------------------- text helpers
@@ -254,15 +258,6 @@ def video_block(v: dict) -> str:
     )
 
 
-def video_placeholder(v: dict) -> str:
-    return (
-        '<div class="vid vid--empty">'
-        f'<span class="vid__slot">{E(v.get("title", "clip"))}</span>'
-        f'<span class="vid__hint">{E(v.get("hint", ""))}</span>'
-        "</div>"
-    )
-
-
 def media_block(m: dict) -> str:
     src = E(m.get("src", ""))
     alt = m.get("alt") or m.get("caption", "")
@@ -295,7 +290,16 @@ def build_home(site: dict) -> str:
     projects = site.get("projects", [])
     featured = [pr for pr in projects if pr.get("featured")][:3]
 
-    bits = ['<section class="hero">',
+    # The hero art is a standalone SVG inlined verbatim, so it inherits the colour
+    # tokens and follows the theme. Decorative only: the words carry the meaning.
+    art = ""
+    art_file = CONTENT_DIR / "hero-art.svg"
+    if art_file.exists():
+        art = ('<div class="hero__art" aria-hidden="true">'
+               f'{art_file.read_text(encoding="utf-8").strip()}</div>')
+
+    bits = [f'<section class="hero{" hero--art" if art else ""}">', art,
+            '<div class="hero__inner">',
             f'<h1 class="hero__headline">{rich(hero.get("headline", ""))}</h1>']
     if hero.get("sub"):
         bits.append(f'<p class="hero__sub">{rich(hero["sub"])}</p>')
@@ -303,23 +307,26 @@ def build_home(site: dict) -> str:
         bits.append('<div class="hero__links">' + "".join(
             f'<a class="btn{" btn--primary" if b.get("primary") else ""}" '
             f'href="{E(b["url"])}">{E(b["label"])}</a>' for b in hero["buttons"]) + "</div>")
-    bits.append("</section>")
-
-    if site.get("videos"):
-        cells = [video_block(v) if (v.get("src") or v.get("youtube")) else video_placeholder(v)
-                 for v in site["videos"][:4]]
-        bits.append(f'<section class="section reveal"><div class="vid-grid">'
-                    f'{"".join(cells)}</div></section>')
+    bits.append("</div></section>")
 
     bits.append(
-        '<section class="section reveal">'
-        '<div class="section__head"><h2 class="section__title">Featured projects</h2>'
-        '<a class="section__more" href="/projects.html">View all &rarr;</a></div>'
-        f'<div class="card-grid">'
-        + "".join(project_card(pr, eager=(i < 2))
+        '<section class="section reveal" id="work">'
+        '<div class="section__head"><h2 class="section__title">Featured projects</h2></div>'
+        f'<div class="card-list">'
+        + "".join(project_card(pr, eager=(i < 1))
                    for i, pr in enumerate(featured)) + "</div>"
+        '<div class="section__foot"><a class="btn" href="/projects.html">'
+        "See all projects</a></div>"
         "</section>"
     )
+
+    # Empty slots read as an unfinished site, so the strip only appears once
+    # there are enough real clips to fill it.
+    clips = [v for v in site.get("videos", []) if v.get("src") or v.get("youtube")]
+    if len(clips) >= MIN_CLIPS:
+        bits.append('<section class="section reveal"><div class="section__head">'
+                    '<h2 class="section__title">In motion</h2></div><div class="vid-grid">'
+                    f'{"".join(video_block(v) for v in clips[:4])}</div></section>')
 
     about = site.get("about", {})
     photo = ""
@@ -332,8 +339,31 @@ def build_home(site: dict) -> str:
         f'{photo}<div class="about-teaser__text">'
         '<h2 class="section__title">About</h2>'
         f'{paras(teaser)}'
-        '<a class="section__more" href="/about.html">More about me &rarr;</a>'
+        '<div class="section__foot"><a class="btn" href="/about.html">Read more about me</a></div>'
         "</div></section>"
+    )
+
+    # The visitor who reaches the bottom is the interested one; don't make them
+    # scroll back up for a way to get in touch.
+    contact = []
+    if p.get("email"):
+        contact.append(("Email", f'mailto:{p["email"]}', p["email"]))
+    for key, lbl in (("linkedin", "LinkedIn"), ("github", "GitHub"), ("scholar", "Scholar")):
+        if p.get(key):
+            contact.append((lbl, p[key], re.sub(r"^https?://(www\.)?", "", p[key]).rstrip("/")))
+    if p.get("resume"):
+        contact.append(("CV", p["resume"], "PDF, one page"))
+    rows = "".join(
+        f'<li class="contact__item"><span class="contact__label">{E(lbl)}</span>'
+        f'<a class="contact__value" href="{E(url)}"'
+        f'{NOOPENER if url.startswith("http") else ""}>{E(txt)}</a></li>'
+        for lbl, url, txt in contact)
+    bits.append(
+        '<section class="section reveal contact" id="contact">'
+        '<h2 class="section__title">Contact</h2>'
+        f'<p class="contact__lede">The quickest way to reach me is email. '
+        f'I am based in {E(p.get("location", ""))}.</p>'
+        f'<ul class="contact__links">{rows}</ul></section>'
     )
 
     return page("".join(bits), title=f'{p.get("name", "")} — {p.get("job_title", "")}',
@@ -523,8 +553,9 @@ def main() -> int:
     ap.add_argument("--strict", action="store_true")
     args = ap.parse_args()
 
-    global ASSETS
+    global ASSETS, CONTENT_DIR
     ASSETS = Path(args.assets)
+    CONTENT_DIR = Path(args.content).parent
 
     site = json.loads(Path(args.content).read_text(encoding="utf-8"))
 
