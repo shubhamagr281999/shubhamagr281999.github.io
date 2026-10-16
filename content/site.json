@@ -36,8 +36,9 @@
   },
   "videos": [
     {
-      "title": "Soft continuum robot tracking a path",
-      "hint": "drop an .mp4 in assets/media and set src"
+      "title": "Soft continuum robot tracing an S, 5× speed",
+      "src": "/assets/media/soft-robot-tracking-s.mp4",
+      "poster": "/assets/media/soft-robot-tracking-s.jpg"
     },
     {
       "title": "Policy rollout in MuJoCo",
@@ -231,16 +232,27 @@
         }
       ],
       "lead_media": {
-        "src": "/assets/media/soft-robot-hardware.jpg",
-        "alt": "Five-segment tendon-driven soft continuum robot lying on a horizontal white frame, each segment a translucent cast silicone core between rigid printed plates carrying three red tracking markers, with tendon cables running along both sides",
-        "caption": "The assembled robot under the overhead camera. The red markers on each segment plate are what the vision system fits position and slope to.",
-        "width": 860,
-        "height": 1268
+        "type": "video",
+        "src": "/assets/media/soft-robot-tracking-s.mp4",
+        "poster": "/assets/media/soft-robot-tracking-s.jpg",
+        "alt": "Overhead camera view of the five-segment soft robot bending as its tip traces an S about 10 mm tall, beside live plots of the commanded path in red dashes and the measured tip path in blue, which closely overlap",
+        "caption": "The robot tracing an S, at 5× speed. Red dashes are the commanded tip path, blue is what the overhead camera measured; the inset bottom left is a close-up of the tip.",
+        "width": 960,
+        "height": 536
       },
       "sections": [
         {
           "heading": "A model that is both fast and honest",
-          "body": "The planar body is a square mesh. Every vertex is a node carrying a share of the mass, every edge and diagonal is a spring, and springs act in parallel where squares share an edge. The dynamics are the usual mass, damping and stiffness form with Rayleigh damping.\n\nThe load-bearing detail is that the stiffness matrix is rebuilt from the deformed configuration at every step. That is what lets a lumped mass-spring network capture geometric nonlinearity at large deflection, and it is the whole reason this competes with finite elements for accuracy while staying cheap enough to run repeatedly.\n\nI did not invent the mass-spring topology. It comes from my supervisor's earlier work; my contribution was validating it in the large-deformation range and building the first control stack on it. I benchmarked it four independent ways: against linear analytical solutions in tension and compression, against a chained beam-constraint model under end force and pure moment, against FEM for distributed bending across three aspect ratios, and against FEM for the first three natural frequencies.\n\nOne benchmark disagrees. The step-response settling value in one axis does not match FEM, by about a millimetre. I reported it rather than dropping the plot."
+          "media": [
+            {
+              "src": "/assets/media/soft-robot-hardware.jpg",
+              "alt": "Five-segment tendon-driven soft continuum robot lying on a horizontal white frame, each segment a translucent cast silicone core between rigid printed plates carrying three red tracking markers, with tendon cables running along both sides",
+              "caption": "The assembled robot under the overhead camera. The red markers on each segment plate are what the vision system fits position and slope to.",
+              "width": 860,
+              "height": 1268
+            }
+          ],
+          "body":"The planar body is a square mesh. Every vertex is a node carrying a share of the mass, every edge and diagonal is a spring, and springs act in parallel where squares share an edge. The dynamics are the usual mass, damping and stiffness form with Rayleigh damping.\n\nThe load-bearing detail is that the stiffness matrix is rebuilt from the deformed configuration at every step. That is what lets a lumped mass-spring network capture geometric nonlinearity at large deflection, and it is the whole reason this competes with finite elements for accuracy while staying cheap enough to run repeatedly.\n\nI did not invent the mass-spring topology. It comes from my supervisor's earlier work; my contribution was validating it in the large-deformation range and building the first control stack on it. I benchmarked it four independent ways: against linear analytical solutions in tension and compression, against a chained beam-constraint model under end force and pure moment, against FEM for distributed bending across three aspect ratios, and against FEM for the first three natural frequencies.\n\nOne benchmark disagrees. The step-response settling value in one axis does not match FEM, by about a millimetre. I reported it rather than dropping the plot."
         },
         {
           "heading": "A Jacobian from seven simulators",

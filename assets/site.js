@@ -87,11 +87,34 @@
     apply(known ? initial : "all", false);
   }
 
+  /* --------------------------------------------------------- video loops */
+
+  // Clips autoplay as silent loops. Under reduced motion they stop on the
+  // poster frame and get controls, so playing them is the reader's choice.
+  function initVideos() {
+    var vids = Array.prototype.slice.call(document.querySelectorAll("video[autoplay]"));
+    function apply() {
+      vids.forEach(function (v) {
+        if (reduced.matches) {
+          v.pause();
+          v.controls = true;
+        } else {
+          v.controls = false;
+          var p = v.play();
+          if (p && p.catch) p.catch(function () { /* autoplay blocked — poster stays */ });
+        }
+      });
+    }
+    apply();
+    if (reduced.addEventListener) reduced.addEventListener("change", apply);
+  }
+
   /* ------------------------------------------------------------------ init */
 
   function init() {
     initReveal();
     initFilters();
+    initVideos();
   }
 
   if (document.readyState === "loading") {
