@@ -90,28 +90,144 @@ def rounded(d, box, r, outline, width=3, fill=None):
 
 # --------------------------------------------------------------- 1. VLA loop
 
+def chain(d, base, angles, lengths, col=INK, w=7, joint=8):
+    """Planar serial arm from absolute-summed joint angles; returns the tip."""
+    pts, a = [base], 0.0
+    for q, l in zip(angles, lengths):
+        a += q
+        pts.append((pts[-1][0] + l * math.cos(a), pts[-1][1] + l * math.sin(a)))
+    for p0, p1 in zip(pts, pts[1:]):
+        d.line([S(*p0), S(*p1)], fill=col, width=w * SS)
+    for p in pts[:-1]:
+        d.ellipse([S(p[0] - joint, p[1] - joint), S(p[0] + joint, p[1] + joint)],
+                  fill=GROUND, outline=col, width=3 * SS)
+    return pts[-1], a
+
+
+def gripper(d, tip, a, col=INK, w=5, size=18):
+    n = (-math.sin(a), math.cos(a))
+    for s in (+1, -1):
+        b = (tip[0] + s * size * n[0], tip[1] + s * size * n[1])
+        d.line([S(*b), S(b[0] + size * math.cos(a), b[1] + size * math.sin(a))],
+               fill=col, width=w * SS)
+    d.line([S(tip[0] + size * n[0], tip[1] + size * n[1]),
+            S(tip[0] - size * n[0], tip[1] - size * n[1])], fill=col, width=w * SS)
+
+
+def dashed(d, pts, col, w=3, on=10, off=8):
+    for p0, p1 in zip(pts, pts[1:]):
+        L = math.dist(p0, p1)
+        k = 0.0
+        while k < L:
+            a, b = k / L, min(k + on, L) / L
+            d.line([S(p0[0] + a * (p1[0] - p0[0]), p0[1] + a * (p1[1] - p0[1])),
+                    S(p0[0] + b * (p1[0] - p0[0]), p0[1] + b * (p1[1] - p0[1]))],
+                   fill=col, width=w * SS)
+            k += on + off
+
+
 def fig_vla():
-    """The data flywheel. A generic ML-ops cycle — no employer specifics."""
+    """A generic VLA, drawn as an architecture: inputs through projectors into a VLM
+    backbone, an action head emitting a chunk, a controller, the robot, and robot
+    data flowing back as training data. These are the parts every public VLA has;
+    nothing here depicts the in-house design, the team's arms or any dataset."""
     im, d = canvas()
-    boxes = [
-        (150, 90, 520, 210, "teleoperation", "raw episodes"),
-        (690, 90, 1060, 210, "curation", "trim - balance - QC"),
-        (690, 560, 1060, 690, "evaluation", "sim or real, one path"),
-        (150, 560, 520, 690, "fine-tuning", "policy checkpoint"),
-    ]
-    for (x0, y0, x1, y1, t, s) in boxes:
-        rounded(d, (x0, y0, x1, y1), 8, INK, 3)
-        label(d, x0 + 26, y0 + 30, t, 26, INK, bold=True)
-        label(d, x0 + 26, y0 + 72, s, 16, INK3)
+    PALE = (206, 203, 197)
 
-    arrow(d, (525, 150), (685, 150))
-    arrow(d, (875, 215), (875, 555))
-    arrow(d, (685, 625), (525, 625))
-    arrow(d, (335, 555), (335, 215))
+    # ---- inputs, each with its own projector
+    rows = [(110, "images"), (245, "instruction"), (380, "state")]
+    for y, name in rows:
+        label(d, 50, y - 52, name, 20, INK2, bold=True)
+    # camera frame with an object in it
+    d.rectangle([S(50, 92), S(190, 172)], outline=INK, width=3 * SS)
+    d.line([S(50, 150), S(190, 150)], fill=INK3, width=2 * SS)
+    d.rectangle([S(104, 124), S(130, 150)], fill=SIGNAL_SOFT)
+    d.ellipse([S(150, 132), S(168, 150)], outline=INK2, width=3 * SS)
+    # instruction as a row of word tokens
+    for i, w in enumerate((36, 24, 40, 22)):
+        x = 50 + sum((36, 24, 40, 22)[:i]) + i * 6
+        d.rectangle([S(x, 228), S(x + w, 258)], outline=INK, width=3 * SS)
+    # robot state as a short joint vector
+    for i, h in enumerate((22, 34, 14, 28, 18, 30)):
+        x = 50 + i * 24
+        d.rectangle([S(x, 408 - h), S(x + 16, 408)], fill=INK2)
+    d.line([S(46, 410), S(194, 410)], fill=INK3, width=2 * SS)
 
-    d.ellipse([S(556, 355), S(644, 443)], outline=SIGNAL, width=3 * SS)
-    label(d, 578, 384, "loop", 19, SIGNAL, bold=True)
-    label(d, 150, 730, "Schematic: the data flywheel a VLA policy is trained inside.", 17, INK3)
+    # projectors: small trapezoids mapping each input into the token space
+    for y in (132, 243, 390):
+        yc = y
+        d.polygon([S(222, yc - 26), S(268, yc - 14), S(268, yc + 14), S(222, yc + 26)],
+                  fill=WASH, outline=SIGNAL)
+        arrow(d, (196, yc), (216, yc), col=INK3, w=2, head=8)
+        arrow(d, (272, yc), (312, yc), col=INK3, w=2, head=8)
+    label(d, 196, 58, "projectors", 18, INK3)
+
+    # ---- VLM backbone: a token grid feeding stacked transformer blocks
+    bx0, by0, bx1, by1 = 318, 70, 640, 430
+    d.rectangle([S(bx0, by0), S(bx1, by1)], outline=INK, width=4 * SS)
+    for i in range(7):
+        y = by0 + 34 + i * 44
+        d.rectangle([S(bx0 + 30, y), S(bx1 - 30, y + 24)], fill=PALE)
+        for j in range(9):
+            x = bx0 + 40 + j * 30
+            d.rectangle([S(x, y + 7), S(x + 10, y + 17)], fill=GROUND)
+    label(d, bx0, by1 + 14, "VLM backbone", 28, INK, bold=True)
+    label(d, bx0, by1 + 52, "open-source, pretrained", 17, INK3)
+
+    # ---- action head, emitting a chunk of future actions
+    hx0, hx1 = 690, 820
+    arrow(d, (bx1 + 6, 250), (hx0 - 6, 250), col=INK2)
+    d.rectangle([S(hx0, 150), S(hx1, 350)], outline=SIGNAL, width=4 * SS)
+    for i in range(3):
+        y = 178 + i * 52
+        d.rectangle([S(hx0 + 22, y), S(hx1 - 22, y + 30)], fill=WASH, outline=SIGNAL_SOFT)
+    arrow(d, (755, 146), (755, 124), col=SIGNAL, w=3, head=9)
+    label(d, hx0 - 4, 362, "action", 26, INK, bold=True)
+    label(d, hx0 - 4, 396, "head", 26, INK, bold=True)
+    for i in range(6):
+        x = hx0 - 4 + i * 23
+        d.rectangle([S(x, 100), S(x + 17, 117)], fill=SIGNAL if i else WASH)
+    label(d, hx0 - 4, 66, "action chunk", 17, INK3)
+
+    # ---- controller: a QP pulling the target back into the feasible set
+    cx0, cy0, cx1, cy1 = 880, 160, 1010, 340
+    arrow(d, (hx1 + 6, 250), (cx0 - 6, 250), col=INK2)
+    d.rectangle([S(cx0, cy0), S(cx1, cy1)], outline=INK, width=4 * SS)
+    poly = [(cx0 + 22, cy1 - 30), (cx0 + 34, cy0 + 40), (cx0 + 96, cy0 + 28),
+            (cx1 - 18, cy0 + 100), (cx0 + 76, cy1 - 22)]
+    d.polygon([S(*p) for p in poly], fill=WASH)
+    d.line([S(*p) for p in poly + poly[:1]], fill=INK2, width=2 * SS)
+    d.ellipse([S(cx1 - 30, cy0 + 22), S(cx1 - 18, cy0 + 34)], outline=INK2, width=2 * SS)
+    d.ellipse([S(cx0 + 98, cy0 + 50), S(cx0 + 112, cy0 + 64)], fill=SIGNAL)
+    label(d, cx0, 362, "controller", 26, INK, bold=True)
+    label(d, cx0, 398, "IK, limits", 17, INK3)
+
+    # ---- robot
+    arrow(d, (cx1 + 6, 250), (1050, 250), col=INK2)
+    base = (1110, 420)
+    tip, a = chain(d, base, (-1.9, 0.9, 0.9), (120, 95, 34), col=INK, w=7, joint=8)
+    gripper(d, tip, a, col=INK, w=5, size=13)
+    d.rectangle([S(base[0] - 44, base[1]), S(base[0] + 44, base[1] + 14)], fill=INK)
+    label(d, 1062, 452, "robot", 26, INK, bold=True)
+
+    # ---- data back to the model: episodes become training data
+    ey = 600
+    arrow(d, (1110, 490), (1110, ey - 34), col=SIGNAL)
+    for k in range(3):
+        y = ey - 20 + k * 22
+        d.rectangle([S(890, y), S(1170, y + 14)], outline=INK3, width=2 * SS)
+        for j in range(12):
+            d.rectangle([S(896 + j * 23, y + 4), S(910 + j * 23, y + 10)],
+                        fill=PALE if (j + k) % 4 else SIGNAL_SOFT)
+    label(d, 890, ey + 58, "robot episodes", 20, INK2, bold=True)
+    label(d, 890, ey + 90, "teleoperation + rollouts", 17, INK3)
+    dashed(d, [(880, ey + 4), (480, ey + 4), (480, 540)], SIGNAL, w=4, on=14, off=9)
+    arrow(d, (480, 560), (480, 532), col=SIGNAL, w=4)
+    dashed(d, [(755, ey + 4), (755, 470)], SIGNAL, w=4, on=14, off=9)
+    arrow(d, (755, 490), (755, 462), col=SIGNAL, w=4)
+    label(d, 500, ey + 22, "training data", 26, SIGNAL, bold=True)
+    label(d, 50, 752, "Schematic: a vision-language-action model, the controller it drives, "
+          "and the data it learns from.", 16, INK3)
     save(im, "fig-vla-loop.jpg")
 
 
