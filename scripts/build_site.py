@@ -298,16 +298,32 @@ def build_home(site: dict) -> str:
         art = ('<div class="hero__art" aria-hidden="true">'
                f'{art_file.read_text(encoding="utf-8").strip()}</div>')
 
-    bits = [f'<section class="hero{" hero--art" if art else ""}">', art,
-            '<div class="hero__inner">',
-            f'<h1 class="hero__headline">{rich(hero.get("headline", ""))}</h1>']
+    # His name is the first thing to read, so it is the h1 and the positioning
+    # line becomes the lede under it. The portrait is above the fold: no lazy
+    # loading, and it is fetched early. A missing file just drops it.
+    photo = ""
+    src = p.get("photo_hero", "")
+    w, h = image_size(src, ASSETS)
+    if w:
+        hi = p.get("photo_hero_2x", "")
+        srcset = f' srcset="{E(hi)} 2x"' if image_size(hi, ASSETS)[0] else ""
+        photo = ('<div class="hero__photo">'
+                 f'<img class="hero__img" src="{E(src)}"{srcset} width="{w}" height="{h}" '
+                 f'alt="Portrait of {E(p.get("name", ""))}" fetchpriority="high" '
+                 'decoding="async"></div>')
+
+    cls = "hero" + (" hero--art" if art else "") + (" hero--photo" if photo else "")
+    bits = [f'<section class="{cls}">', art, '<div class="hero__inner">',
+            f'<h1 class="hero__name">{E(p.get("name", ""))}</h1>', photo,
+            '<div class="hero__text">',
+            f'<p class="hero__headline">{rich(hero.get("headline", ""))}</p>']
     if hero.get("sub"):
         bits.append(f'<p class="hero__sub">{rich(hero["sub"])}</p>')
     if hero.get("buttons"):
         bits.append('<div class="hero__links">' + "".join(
             f'<a class="btn{" btn--primary" if b.get("primary") else ""}" '
             f'href="{E(b["url"])}">{E(b["label"])}</a>' for b in hero["buttons"]) + "</div>")
-    bits.append("</div></section>")
+    bits.append("</div></div></section>")
 
     bits.append(
         '<section class="section reveal" id="work">'
@@ -329,14 +345,12 @@ def build_home(site: dict) -> str:
                     f'{"".join(video_block(v) for v in clips[:4])}</div></section>')
 
     about = site.get("about", {})
-    photo = ""
-    if p.get("photo"):
-        photo = (f'<img class="portrait" src="{E(p["photo"])}" '
-                 f'alt="Portrait of {E(p.get("name", ""))}">')
+    # Text only: the portrait already leads the hero, and the same picture twice
+    # on one page reads as filler. The About page carries it again.
     teaser = about.get("teaser") or (about.get("bio", [""])[0] if about.get("bio") else "")
     bits.append(
-        f'<section class="section reveal about-teaser{" about-teaser--photo" if photo else ""}">'
-        f'{photo}<div class="about-teaser__text">'
+        '<section class="section reveal about-teaser">'
+        '<div class="about-teaser__text">'
         '<h2 class="section__title">About</h2>'
         f'{paras(teaser)}'
         '<div class="section__foot"><a class="btn" href="/about.html">Read more about me</a></div>'
@@ -427,7 +441,9 @@ def build_about(site: dict) -> str:
     about = site.get("about", {})
     photo = ""
     if p.get("photo"):
-        photo = (f'<img class="portrait portrait--lg" src="{E(p["photo"])}" '
+        w, h = image_size(p["photo"], ASSETS)
+        dims = f' width="{w}" height="{h}"' if w else ""
+        photo = (f'<img class="portrait portrait--lg" src="{E(p["photo"])}"{dims} '
                  f'alt="Portrait of {E(p.get("name", ""))}">')
 
     bio = about.get("bio", [])

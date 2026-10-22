@@ -131,6 +131,10 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .page-home.is-scrolled .site-header {
   background: var(--ground); border-bottom-color: var(--rule);
 }
+/* The hero sets the name large, so the header's copy waits until the page has
+   scrolled rather than repeating it on the first screen. */
+.page-home .site-header__name { transition: opacity 0.25s var(--ease), visibility 0.25s; }
+.page-home:not(.is-scrolled) .site-header__name { opacity: 0; visibility: hidden; }
 
 /* ---------------------------------------------------------------- layout */
 
@@ -162,13 +166,23 @@ main { max-width: var(--page); margin-inline: auto; padding-inline: 1.5rem; }
 /* Full-bleed landing: the art covers the first screen and the words sit
    bottom-left on a scrim, so the three buttons are visible without scrolling. */
 .hero--art {
+  /* The art is drawn xMaxYMin slice into the first screen: one viewBox unit is
+     --art-u px and viewBox x 1600 is the right edge, so a point in the drawing
+     sits at 100vw - (1600 - x) * --art-u. */
+  --art-u: max(100vw / 1600, 100vh / 1000);
+  --gutter: max(1.5rem, calc(50vw - var(--page) / 2 + 1.5rem));
   position: relative; isolation: isolate; overflow: hidden;
   display: flex; align-items: flex-end;
   min-height: 100vh; min-height: 100svh;
   margin-inline: calc(50% - 50vw);
-  padding: 6rem max(1.5rem, calc(50vw - var(--page) / 2 + 1.5rem)) clamp(2.5rem, 8vh, 5.5rem);
+  padding: 6rem var(--gutter) clamp(2.5rem, 8vh, 5.5rem);
 }
-.hero__art { position: absolute; inset: 0; z-index: -2; pointer-events: none; }
+/* pinned to the first screen, so the drawing keeps its scale if the words
+   ever run taller than the viewport (they do on a phone) */
+.hero__art {
+  position: absolute; inset: 0 0 auto; height: 100vh; height: 100svh;
+  z-index: -2; pointer-events: none;
+}
 .hero__art svg { display: block; width: 100%; height: 100%; }
 .hero--art::before {
   content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
@@ -180,24 +194,67 @@ main { max-width: var(--page); margin-inline: auto; padding-inline: 1.5rem; }
     linear-gradient(to top, color-mix(in srgb, var(--ground) 70%, transparent), transparent 30%);
 }
 .hero__inner { position: relative; max-width: 46rem; }
-.hero--art .hero__headline {
-  /* long positioning line: wider measure, smaller size, so it holds to three
-     lines and stays clear of the art above it */
-  font-size: clamp(1.9rem, 1.2rem + 1.9vw, 2.55rem); max-width: 30ch;
+.hero--art .hero__inner {
+  /* the words stop short of the plan's vertical wall (viewBox x 954, less ~50
+     units of air) wherever that still leaves a readable column */
+  max-width: max(var(--photo-w, 0px) + 21rem,
+                 min(46rem, 100vw - 696 * var(--art-u) - var(--gutter)));
 }
-.hero--art .hero__sub { color: var(--ink); opacity: 0.86; }
+.hero--art .hero__sub { color: var(--ink); opacity: 0.86; line-height: 1.55; }
 .hero--art .hero__links { margin-top: var(--s4); }
 .hero--art .btn:not(.btn--primary) { background: var(--ground); }
 
+.hero__name {
+  font-size: clamp(2.6rem, min(5.3vw, 8.6vh), 5.5rem);
+  font-weight: 700; line-height: 0.9; letter-spacing: -0.04em;
+  white-space: nowrap;
+}
+
+/* the positioning line, set as the lede under the name */
 .hero__headline {
-  font-size: clamp(1.85rem, 1.1rem + 3.2vw, 3.1rem);
-  letter-spacing: -0.026em;
-  font-weight: 700;
-  max-width: 22ch;
+  margin: var(--s3) 0 0;
+  font-size: clamp(1.08rem, 0.86rem + 0.5vw, 1.25rem);
+  font-weight: 500; line-height: 1.38; letter-spacing: -0.01em;
+  max-width: 36ch;
   text-wrap: balance;
 }
 
-.hero__sub { margin-top: var(--s4); color: var(--ink-2); font-size: 1.09rem; max-width: 58ch; }
+.hero__sub { margin-top: var(--s3); color: var(--ink-2); font-size: 1.09rem; max-width: 58ch; }
+
+/* With a portrait: the name runs across the top, the portrait sits under it on
+   the left, and the words take a column beside it. */
+.hero--photo .hero__inner {
+  --photo-w: clamp(9rem, min(14.5vw, 30vh), 15rem);
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start;
+  gap: clamp(0.6rem, 2vh, 1.2rem) 0.5rem;
+}
+.hero--photo .hero__name { grid-column: 1 / -1; position: relative; z-index: 1; }
+.hero--photo .hero__headline { margin-top: 0; }
+.hero--photo .hero__text { position: relative; }
+
+/* The portrait dissolves into the page instead of sitting on it: every edge
+   fades to nothing, briefly at the top and left, long at the bottom and right
+   where it meets the words. The two masks sit on two boxes, so they multiply;
+   the stops are eased so no edge of the fade shows. */
+.hero__photo {
+  /* rises behind the name; the words may start over its last, fully faded rem */
+  width: var(--photo-w); margin: -1.6rem -1rem 0;
+  -webkit-mask-image: linear-gradient(to bottom,
+    transparent, rgb(0 0 0 / 0.16) 3%, rgb(0 0 0 / 0.5) 6%, rgb(0 0 0 / 0.84) 9%, #000 12%,
+    #000 58%, rgb(0 0 0 / 0.84) 68.5%, rgb(0 0 0 / 0.5) 79%, rgb(0 0 0 / 0.16) 89.5%, transparent);
+          mask-image: linear-gradient(to bottom,
+    transparent, rgb(0 0 0 / 0.16) 3%, rgb(0 0 0 / 0.5) 6%, rgb(0 0 0 / 0.84) 9%, #000 12%,
+    #000 58%, rgb(0 0 0 / 0.84) 68.5%, rgb(0 0 0 / 0.5) 79%, rgb(0 0 0 / 0.16) 89.5%, transparent);
+}
+.hero__img {
+  width: 100%;
+  -webkit-mask-image: linear-gradient(to right,
+    transparent, rgb(0 0 0 / 0.16) 3.5%, rgb(0 0 0 / 0.5) 7%, rgb(0 0 0 / 0.84) 10.5%, #000 14%,
+    #000 70%, rgb(0 0 0 / 0.84) 77.5%, rgb(0 0 0 / 0.5) 85%, rgb(0 0 0 / 0.16) 92.5%, transparent);
+          mask-image: linear-gradient(to right,
+    transparent, rgb(0 0 0 / 0.16) 3.5%, rgb(0 0 0 / 0.5) 7%, rgb(0 0 0 / 0.84) 10.5%, #000 14%,
+    #000 70%, rgb(0 0 0 / 0.84) 77.5%, rgb(0 0 0 / 0.5) 85%, rgb(0 0 0 / 0.16) 92.5%, transparent);
+}
 
 .hero__links { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s3); margin-top: var(--s5); }
 
@@ -493,14 +550,27 @@ main { max-width: var(--page); margin-inline: auto; padding-inline: 1.5rem; }
   .section { padding-block: var(--s5); }
   .hero { padding-block: var(--s5) var(--s4); }
   .hero--art { padding-top: 7rem; padding-bottom: var(--s5); }
-  .hero--art .hero__headline { font-size: 1.7rem; }
   .hero--art .hero__sub { font-size: 1rem; }
-  .hero--art::before {
-    background: linear-gradient(to top,
-      var(--ground) 0%, var(--ground) 38%,
-      color-mix(in srgb, var(--ground) 75%, transparent) 62%, transparent 85%);
-  }
   .portrait, .portrait--lg { width: 140px; height: 140px; }
+}
+
+/* Narrow or portrait screens: the arm viewport fills the top of the art, so the
+   hero stacks in one column (name, portrait, words) starting below it, and runs
+   on past the first screen. */
+@media (max-width: 46rem), (orientation: portrait) {
+  /* measured from the top of the first screen, so a hero that runs taller
+     than the viewport still washes the art exactly as a full-screen one does */
+  .hero--art::before {
+    background: linear-gradient(to bottom, transparent 15vh,
+      color-mix(in srgb, var(--ground) 75%, transparent) 38vh, var(--ground) 62vh);
+    background: linear-gradient(to bottom, transparent 15svh,
+      color-mix(in srgb, var(--ground) 75%, transparent) 38svh, var(--ground) 62svh);
+  }
+  .hero--photo { padding-top: 44vh; padding-top: 44svh; }
+  .hero--photo .hero__inner { display: block; }
+  .hero--photo .hero__name { font-size: min(10.8vw, 4.5rem); }
+  .hero__photo { width: min(56vw, 15rem); margin: -0.6rem 0 0 -0.75rem; }
+  .hero--photo .hero__headline { margin-top: var(--s2); }
 }
 
 @media (max-width: 30rem) {
