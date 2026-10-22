@@ -48,9 +48,9 @@
     {
       "slug": "vla-manipulation-infra",
       "title": "Robot-learning models and infrastructure for VLA manipulation",
-      "period": "Apr 2026 – present · Miko",
+      "period": "Feb 2026 – present · Miko",
       "role": "Part of the design group for our in-house VLA model. Designed and built the cross-embodiment dataset-validation workflow. Created the simulation and evaluation framework, sole-authored the dataset curation tool, and ran the action-space experiments.",
-      "hook": "Six months from fine-tuning open-source VLA models to designing our own. The shift needed three things: a model designed around an open-source VLM, a workflow that turns mismatched open-source robot datasets into one trustworthy training set, and the controllers and evaluation that run the resulting policies on real arms.",
+      "hook": "Under a year from fine-tuning open-source VLA models to designing our own. The shift needed three things: a model designed around an open-source VLM, a workflow that turns mismatched open-source robot datasets into one trustworthy training set, and the controllers and evaluation that run the resulting policies on real arms.",
       "problem": "Open-source VLA models and robot datasets exist, but they do not fit together on their own. Every public dataset records a different robot with its own joint order, frame conventions, gripper polarity and quirks, and a training set that mixes them wrongly fails silently. The policy's action space has to be chosen deliberately. And a policy that outputs end-effector motion needs a controller that turns it into safe joint commands on real hardware.",
       "approach": "I work across the whole path. On the model, I fine-tuned open-source VLAs on our data and am now part of the group designing our own around an open-source VLM backbone: the action head, the projectors, and how information about the robot enters the model. On the data, I designed a validation workflow that maps each open-source dataset onto a verified model of its robot and proves the mapping before any of it reaches training, alongside a curation tool for our own teleoperation data. On deployment, I ran controlled action-space experiments with π₀.₅, built a constrained IK controller for end-effector actions, and created the framework that evaluates a policy in MuJoCo or on real arms through one code path.",
       "outcome": "Switching π₀.₅ to delta-joint actions raised task completion by 30% over absolute-joint actions, trained on mixed simulation and real data and evaluated in both. The validation workflow has taken five open-source datasets across six robot embodiments through a full-dataset sweep. The IK controller cut end-effector tracking error in simulation from about 2.5 cm to 0.29 mm, solving in about a millisecond per arm with full collision checking.",
@@ -103,7 +103,7 @@
     {
       "slug": "autonomous-ground-robot",
       "title": "Production autonomy stack for an indoor mobile robot",
-      "period": "Jul 2023 – present · Miko",
+      "period": "Jul 2023 – Jan 2026 · Miko",
       "role": "Major contributor across the stack and primary author of its core algorithm modules, the middleware, and the embedded layer.",
       "hook": "Three years on one robot, across every layer of it: the sysfs GPIO driver that moves the wheels, the shared-memory bus that carries the odometry, and the TSDF mapper and planners that decide where to go. The mapping backend was replaced mid-life without touching the planners.",
       "problem": "An indoor robot has to navigate an environment nobody surveyed in advance, keep a usable map of it across power cycles, avoid things that move, and do all of it on a mobile SoC with no ROS on board and a real power budget. Holding those layers together is a different problem from solving any one of them.",
